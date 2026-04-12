@@ -1,0 +1,442 @@
+<script>
+window.CaseWbsState = {
+  type: 'SV',
+  maxDays: 62,
+  rangeDays: 62,
+  startDate: '',
+  rows: [],
+  filteredRows: [],
+  members: [],
+  selectedMember: '',
+  holidaySet: new Set(),
+};
+
+const $cw = (id) => document.getElementById(id);
+
+async function loadCaseWbs() {
+  const typeEl   = $cw('caseWbsType');
+  const dateEl   = $cw('caseWbsStartDate');
+  const rangeEl  = $cw('caseWbsRange');
+  const memberEl = $cw('caseWbsMemberFilter');
+  const reloadEl = $cw('caseWbsReloadBtn');
+
+  if (!typeEl || !dateEl || !rangeEl || !memberEl) return;
+
+  const today = new Date();
+  const defaultStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  dateEl.value = formatDateInput_(defaultStart);
+  CaseWbsState.startDate = dateEl.value;
+  CaseWbsState.type = normalizeCaseTypeClient_(typeEl.value || 'SV');
+  CaseWbsState.rangeDays = Number(rangeEl.value || 62);
+  CaseWbsState.selectedMember = '';
+
+  typeEl.addEventListener('change', async () => {
+    CaseWbsState.type = normalizeCaseTypeClient_(typeEl.value);
+    await loadCaseWbs_(CaseWbsState.type);
+  });
+
+  dateEl.addEventListener('change', () => {
+    CaseWbsState.startDate = dateEl.value || formatDateInput_(defaultStart);
+    applyCaseWbsFilters_();
+    renderCaseWbs_();
+  });
+
+  rangeEl.addEventListener('change', () => {
+    CaseWbsState.rangeDays = Number(rangeEl.value || 62);
+    renderCaseWbs_();
+  });
+
+  memberEl.addEventListener('change', () => {
+    CaseWbsState.selectedMember = String(memberEl.value || '').trim();
+    applyCaseWbsFilters_();
+    renderCaseWbs_();
+  });
+
+  if (reloadEl) {
+    reloadEl.addEventListener('click', async () => {
+      await loadCaseWbs_(CaseWbsState.type);
+    });
+  }
+  await loadCaseWbsHoliday_();
+  await loadCaseWbs_(CaseWbsState.type);
+}
+
+async function loadCaseWbs_(type) {
+  setErr('');
+  setMeta('読込中...');
+
+  try {
+    const res = await gasCall_('api_getCaseWbsRows', type);
+
+    if (!res || !res.ok) {
+      throw new Error((res && res.error) || '読込に失敗しました。');
+    }
+
+    CaseWbsState.type = normalizeCaseTypeClient_(res.type || type);
+    CaseWbsState.maxDays = Number(res.maxDays || 62);
+    CaseWbsState.rows = Array.isArray(res.rows) ? res.rows : [];
+    CaseWbsState.members = Array.isArray(res.members) ? res.members : [];
+
+    buildCaseWbsMemberFilter_(CaseWbsState.members, CaseWbsState.selectedMember);
+    applyCaseWbsFilters_();
+    renderCaseWbs_();
+
+  } catch (err) {
+    console.error(err);
+    setErr(err && err.message ? err.message : String(err));
+    setMeta('');
+    $cw('caseWbsRoot').innerHTML = '';
+  }
+}
+
+function applyCaseWbsFilters_() {
+  const selected = String(CaseWbsState.selectedMember || '').trim();
+
+  let rows = Array.isArray(CaseWbsState.rows) ? [...CaseWbsState.rows] : [];
+
+  if (selected) {
+    rows = rows.filter(r => {
+      const members = Array.isArray(r.members) ? r.members : [];
+      return members.includes(selected);
+    });
+  }
+
+  CaseWbsState.filteredRows = rows;
+}
+
+function renderCaseWbs_() {
+  const root = $cw('caseWbsRoot');
+  if (!root) return;
+
+  const rows = Array.isArray(CaseWbsState.filteredRows) ? CaseWbsState.filteredRows : [];
+  const startDate = CaseWbsState.startDate || formatDateInput_(new Date());
+  const rangeDays = Number(CaseWbsState.rangeDays || 62);
+  const days = buildCaseWbsDays_(startDate, rangeDays);
+
+  if (!rows.length) {
+    root.innerHTML = `<div style="padding:16px;color:#64748b;">表示対象がありません。</div>`;
+    setMeta(`0件`);
+    return;
+  }
+
+  const html = `
+    <table class="case-wbs-table">
+      <thead>
+        <tr>
+          <th class="case-wbs-sticky-1 case-wbs-col-info">案件情報</th>
+          <th class="case-wbs-sticky-2 case-wbs-col-se">担当SE</th>
+          <th class="case-wbs-sticky-3 case-wbs-col-cat"></th>
+          <th class="case-wbs-sticky-4 case-wbs-col-status">ステータス</th>
+          <th class="case-wbs-sticky-5 case-wbs-col-period">期間</th>
+          <th class="case-wbs-chart-head">
+            <div class="case-wbs-days">
+              ${days.map(d => {
+                const cls = [
+                  'case-wbs-day-head',
+                  d.isWeekend ? 'is-weekend' : '',
+                  d.isHoliday ? 'is-holiday' : '',
+                  d.isToday ? 'is-today' : '',
+                ].filter(Boolean).join(' ');
+
+                return `
+                  <div class="${cls}">
+                    <span>${d.label}</span>
+                    <span class="dow">${d.dow}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => renderCaseWbsCaseRows_(r, startDate, days)).join('')}
+      </tbody>
+    </table>
+  `;
+
+  root.innerHTML = html;
+  setMeta(`${rows.length}件 / ${CaseWbsState.type}`);
+}
+
+function renderCaseWbsCaseRows_(r, baseDate, days) {
+  const infoHtml = buildCaseWbsInfoHtml_(r);
+  const seHtml   = buildCaseWbsSeHtml_(r);
+
+  const lines = Array.isArray(r.lines) ? r.lines : [];
+  const safeLines = [
+    lines[0] || { category: '案件', status: '', start: '', end: '' },
+    lines[1] || { category: '社内', status: '', start: '', end: '' },
+    lines[2] || { category: '社外', status: '', start: '', end: '' },
+  ];
+
+  return safeLines.map((line, idx) => {
+    const groupStartCls = idx === 0 ? 'is-group-start' : '';
+    const lineCls =
+      line.category === '案件' ? 'case-wbs-line-project' :
+      line.category === '社内' ? 'case-wbs-line-internal' :
+      'case-wbs-line-external';
+
+    return `
+      <tr class="case-wbs-row ${groupStartCls} ${lineCls}">
+        ${idx === 0 ? `<td class="case-wbs-sticky-1 case-wbs-col-info" rowspan="3">${infoHtml}</td>` : ''}
+        ${idx === 0 ? `<td class="case-wbs-sticky-2 case-wbs-col-se" rowspan="3">${seHtml}</td>` : ''}
+
+        <td class="case-wbs-sticky-3 case-wbs-col-cat">${escapeHtml_(line.category || '')}</td>
+        <td class="case-wbs-sticky-4 case-wbs-col-status">${buildCaseWbsStatusPill_(line.status)}</td>
+        <td class="case-wbs-sticky-5 case-wbs-col-period">${escapeHtml_(buildPeriodText_(line.start, line.end))}</td>
+        <td class="case-wbs-col-chart">${buildCaseWbsChart_(line, baseDate, days)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function buildCaseWbsInfoHtml_(r) {
+  return `
+    <div class="case-wbs-info">
+      <div class="case-wbs-key">【${escapeHtml_(nzClient_(r.key))}】</div>
+      <div class="case-wbs-customer">${escapeHtml_(nzClient_(r.customer))}</div>
+    </div>
+  `;
+}
+
+function buildCaseWbsSeHtml_(r) {
+  const subs = [];
+  if (nzClient_(r.supervisor)) subs.push(`監督者：${escapeHtml_(r.supervisor)}`);
+  if (nzClient_(r.manager))    subs.push(`管理者：${escapeHtml_(r.manager)}`);
+  if (nzClient_(r.support))    subs.push(`サポート：${escapeHtml_(r.support)}`);
+
+  return `
+    <div class="case-wbs-se">
+      ${subs.length ? `<div class="case-wbs-se-sub">${subs.join('<br>')}</div>` : ''}
+    </div>
+  `;
+}
+
+function buildCaseWbsStatusPill_(status) {
+  const s = nzClient_(status);
+  if (!s) return `<span class="case-wbs-status-pill st-empty">-</span>`;
+
+  const cls = statusClassClient_(s);
+  return `<span class="case-wbs-status-pill ${cls}">${escapeHtml_(s)}</span>`;
+}
+
+function buildCaseWbsChart_(line, baseDate, days) {
+  const start = nzClient_(line.start);
+  const end   = nzClient_(line.end);
+
+  const dayCols = days.map(d => {
+    const cls = [
+      'case-wbs-chart-day',
+      d.isWeekend ? 'is-weekend' : '',
+      d.isHoliday ? 'is-holiday' : '',
+      d.isToday ? 'is-today' : '',
+    ].filter(Boolean).join(' ');
+
+    return `<div class="${cls}"></div>`;
+  }).join('');
+
+  if (!start || !end) {
+    return `
+      <div class="case-wbs-chart">
+        ${dayCols}
+        <div class="case-wbs-empty-bar"></div>
+      </div>
+    `;
+  }
+
+  const startOffset = diffDays_(baseDate, start);
+  const endOffset   = diffDays_(baseDate, end);
+
+  const totalDays = days.length;
+  const leftIndex = Math.max(0, startOffset);
+  const rightIndex = Math.min(totalDays - 1, endOffset);
+
+  if (rightIndex < 0 || leftIndex > totalDays - 1 || rightIndex < leftIndex) {
+    return `<div class="case-wbs-chart">${dayCols}</div>`;
+  }
+
+  const widthDays = Math.max(1, rightIndex - leftIndex + 1);
+  const isClosed = /クローズ|close/i.test(nzClient_(line.status));
+  const today = formatDateInput_(new Date());
+  const isOverdue = !isClosed && end < today;
+
+  const barClass =
+    line.category === '案件' ? 'project' :
+    line.category === '社内' ? 'internal' :
+    'external';
+
+  const label = buildBarLabel_(start, end);
+
+  return `
+    <div class="case-wbs-chart">
+      ${dayCols}
+      <div class="case-wbs-bar ${barClass} ${isOverdue ? 'overdue' : ''}"
+          style="
+            left:calc(${leftIndex} * var(--case-wbs-day-w) + 2px);
+            width:calc(${widthDays}* var(--case-wbs-day-w) - 20px);
+          ">
+        ${escapeHtml_(label)}
+      </div>
+    </div>
+  `;
+}
+
+function buildBarLabel_(start, end) {
+  if (!start || !end) return '';
+  const s = mdLabel_(start);
+  const e = mdLabel_(end);
+  return start === end ? s : `${s}〜${e}`;
+}
+
+function buildPeriodText_(start, end) {
+  if (!start && !end) return '';
+  if (start && end) {
+    return start === end ? mdLabel_(start) : `${mdLabel_(start)}〜${mdLabel_(end)}`;
+  }
+  return start || end || '';
+}
+
+function buildCaseWbsDays_(startDate, count) {
+  const out = [];
+  const base = parseDateLocal_(startDate);
+  const today = formatDateInput_(new Date());
+  const holidaySet = CaseWbsState.holidaySet || new Set();
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    const ymd = formatDateInput_(d);
+    const dowNum = d.getDay();
+    const isWeekend = dowNum === 0 || dowNum === 6;
+    const isHoliday = holidaySet.has(ymd);
+
+    out.push({
+      ymd,
+      label: `${d.getMonth() + 1}/${d.getDate()}`,
+      dow: ['日', '月', '火', '水', '木', '金', '土'][dowNum],
+      isWeekend,
+      isHoliday,
+      isToday: ymd === today,
+    });
+  }
+
+  return out;
+}
+
+function buildCaseWbsMemberFilter_(members, selectedMember) {
+  const el = $cw('caseWbsMemberFilter');
+  if (!el) return;
+
+  const current = String(selectedMember || '').trim();
+
+  el.innerHTML = [
+    `<option value="">全員</option>`,
+    ...(members || []).map(name => {
+      const sel = current === name ? ' selected' : '';
+      return `<option value="${escapeAttr_(name)}"${sel}>${escapeHtml_(name)}</option>`;
+    })
+  ].join('');
+}
+
+function getMultiSelectValues_(el) {
+  return Array.from(el.options)
+    .filter(opt => opt.selected)
+    .map(opt => String(opt.value || '').trim())
+    .filter(Boolean);
+}
+
+function normalizeCaseTypeClient_(type) {
+  return String(type || 'SV').toUpperCase() === 'CL' ? 'CL' : 'SV';
+}
+
+function statusClassClient_(s) {
+  const v = String(s || '');
+
+  if (/完了/.test(v)) return 'st-done';
+  if (/対応中/.test(v)) return 'st-progress';
+  if (/未着手/.test(v)) return 'st-wait';
+  if (/クローズ/i.test(v)) return 'st-close';
+
+  if(v.includes('未アサイン')) return 'status-assign';
+  if(v.includes('アサイン中')) return 'status-assign';
+
+  if(v.includes('詳細確認')) return 'status-pill status-precheck';
+
+  if(v.includes('作業中')) return 'status-pill status-work';
+
+  if(v.includes('ﾄﾞｷｭﾒﾝﾄ')) return 'status-pill status-doc';
+
+  if(v.includes('ｸﾛｰｽﾞ前')) return 'status-pill status-close-pre';
+
+  if(v.includes('CLOSE')) return 'status-pill status-done';
+
+  return '';
+}
+
+function gasCall_(fn, ...args) {
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)[fn](...args);
+  });
+}
+
+function escapeHtml_(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr_(s) {
+  return escapeHtml_(s);
+}
+
+function nzClient_(v) {
+  return String(v ?? '').trim();
+}
+
+function parseDateLocal_(ymd) {
+  const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+function formatDateInput_(d) {
+  const y = d.getFullYear();
+  const m = ('0' + (d.getMonth() + 1)).slice(-2);
+  const day = ('0' + d.getDate()).slice(-2);
+  return `${y}-${m}-${day}`;
+}
+
+function diffDays_(baseYmd, targetYmd) {
+  const a = parseDateLocal_(baseYmd);
+  const b = parseDateLocal_(targetYmd);
+  return Math.floor((b - a) / 86400000);
+}
+
+function mdLabel_(ymd) {
+  const d = parseDateLocal_(ymd);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+async function loadCaseWbsHoliday_() {
+  try {
+    const res = await gasCall_('api_getPlanHolidayList');
+    if (res && res.ok && Array.isArray(res.dates)) {
+      CaseWbsState.holidaySet = new Set(res.dates);
+    } else {
+      CaseWbsState.holidaySet = new Set();
+    }
+  } catch (err) {
+    console.error(err);
+    CaseWbsState.holidaySet = new Set();
+  }
+}
+</script>

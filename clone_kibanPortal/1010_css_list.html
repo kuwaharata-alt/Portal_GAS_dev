@@ -1,0 +1,450 @@
+<style>
+.panel{
+  display:none;
+}
+.panel.active{
+  display:block;
+}
+
+/* ===== filter ===== */
+.dd{
+  position:relative;
+  display:inline-block;
+}
+.dd-btn{
+  min-width:160px;
+  height:36px;
+  padding:0 10px;
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:10px;
+  text-align:left;
+  cursor:pointer;
+}
+.dd.is-open .dd-menu{
+  display:block;
+}
+.dd-item{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 8px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.dd-item:hover{
+  background:#f8fafc;
+}
+
+/* ===== table ===== */
+.list-table-shell{
+  max-height:80vh;
+  overflow:auto;
+  background:#fff;
+}
+.list-table{
+  width:max-content;
+  min-width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  table-layout:fixed;
+  font-size:13px;
+}
+.list-table th,
+.list-table td{
+  box-sizing:border-box;
+  border-right:1px solid #d6dee8;
+  border-bottom:1px solid #d6dee8;
+  padding:10px 12px;
+  background:#fff;
+  vertical-align:middle;
+}
+.list-table thead th{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:#c8d8e6;
+  color:#111827;
+  text-align:center;
+  font-weight:700;
+}
+.list-table tbody tr:hover td{
+  background:#f8fbff;
+}
+
+/* ===== 自身ハイライト ===== */
+.list-table tbody tr.is-mine td{
+  background:#f0f9ff;
+}
+.list-table tbody tr.is-mine:hover td{
+  background:#e0f2fe;
+}
+.list-table tbody tr.is-mine td:first-child{
+  box-shadow:inset 4px 0 0 #2563eb;
+}
+
+/* ===== 操作 ===== */
+th.col-act,
+td.col-act{
+  width:72px;
+  min-width:72px;
+  text-align:center;
+  vertical-align:middle;
+}
+td.col-act{
+  background:#f8fafc;
+}
+.list-act-btn{
+  display:block;
+  width:52px;
+  margin:0 auto;
+  padding:8px 0;
+  border:1px solid #cfd8e3;
+  border-radius:12px;
+  background:#fff;
+  font-size:12px;
+}
+.list-act-btn + .list-act-btn{
+  margin-top:10px;
+}
+
+/* ===== 案件概要 ===== */
+.td-case-summary{
+  min-width:280px;
+}
+.case-summary-wrap{
+  line-height:1.5;
+}
+.case-summary-head{
+  font-size:14px;
+  font-weight:700;
+  color:#0f172a;
+  margin-bottom:6px;
+}
+.case-summary-head a.case-summary-link{
+  color:inherit;
+  text-decoration:none;
+}
+.case-summary-head a.case-summary-link:hover{
+  text-decoration:underline;
+}
+.case-summary-body{
+  font-size:12px;
+  color:#334155;
+  white-space:normal;
+  word-break:break-word;
+}
+
+/* ===== 案件情報 / 担当SE ===== */
+.td-case-info,
+.td-case-se{
+  white-space:normal;
+}
+.case-info-wrap,
+.case-se-wrap{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.info-line{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+.info-tag{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:58px;
+  padding:2px 8px;
+  border-radius:999px;
+  background:#E8F0FE;
+  color:#1D4ED8;
+  border:1px solid #BFDBFE;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.2;
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+.se-tag{
+  background:#ECFDF5;
+  color:#047857;
+  border-color:#A7F3D0;
+}
+.info-value{
+  display:block;
+  color:#111827;
+  font-size:12px;
+  line-height:1.45;
+  word-break:break-word;
+  white-space:pre-line;
+}
+
+/* ===== 作業期間 ===== */
+.td-work-period{
+  min-width:320px;
+}
+.wp-wrap-simple{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.wp-row-simple{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.wp-label-simple{
+  width:34px;
+  min-width:34px;
+  font-size:11px;
+  font-weight:700;
+  color:#374151;
+}
+.wp-lane-simple{
+  flex:1;
+  height:20px;
+  background:#eef2f7;
+  border-radius:999px;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+}
+.wp-bar-simple{
+  min-width:100%;
+  padding:0 10px;
+  display:flex;
+  align-items:center;
+}
+.wp-bar-text-simple{
+  font-size:11px;
+  color:#6b7280;
+  white-space:nowrap;
+}
+.wp-info-simple{
+  margin-top:2px;
+  font-size:11px;
+  font-weight:700;
+  color:#ea580c;
+}
+
+/* ===== 備考 ===== */
+.td-remarks{
+  padding:8px 12px;
+  white-space:normal;
+}
+.remarks-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.remarks-row{
+  display:grid;
+  grid-template-columns:36px 1fr;
+  align-items:stretch;
+  border:1px solid #cfd8e3;
+  border-radius:12px;
+  overflow:hidden;
+  background:#fff;
+  min-height:40px;
+}
+.remarks-label{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:6px 4px;
+  background:#ffffff;
+  border-right:1px solid #cfd8e3;
+  font-size:12px;
+  font-weight:700;
+  color:#111827;
+  line-height:1.1;
+  writing-mode:vertical-rl;
+  text-orientation:upright;
+  letter-spacing:1px;
+}
+.remarks-text{
+  padding:8px 10px;
+  font-size:12px;
+  line-height:1.45;
+  color:#374151;
+  word-break:break-word;
+  display:flex;
+  align-items:center;
+}
+
+/* ===== フィルターUI ===== */
+.filter-bar{
+  display:flex;
+  gap:14px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.filter-item{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-width:140px;
+}
+.filter-label{
+  font-size:12px;
+  font-weight:700;
+  color:#374151;
+  padding-left:2px;
+}
+.filter-control{
+  height:38px;
+  padding:0 14px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#f8fafc;
+  font-size:14px;
+  color:#111827;
+  outline:none;
+  box-sizing:border-box;
+}
+.filter-control:focus{
+  background:#fff;
+  border-color:#94a3b8;
+}
+.filter-dd{
+  position:relative;
+}
+.dd-btn.filter-control{
+  width:100%;
+  text-align:center;
+  cursor:pointer;
+}
+.dd-menu{
+  position:absolute;
+  top:calc(100% + 6px);
+  left:0;
+  min-width:100%;
+  max-height:320px;
+  overflow:auto;
+  background:#fff;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.1);
+  padding:6px;
+  z-index:100;
+  display:none;
+}
+.dd-menu label,
+.dd-menu button{
+  display:flex;
+  align-items:center;
+  width:100%;
+  padding:6px 10px;
+  border-radius:8px;
+  font-size:13px;
+  cursor:pointer;
+}
+.dd-menu label:hover{
+  background:#f1f5f9;
+}
+
+/* ===== ステータス ===== */
+.status-cell{
+  min-width:160px;
+  text-align:center;
+  vertical-align:middle;
+}
+.status-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  width:100%;
+}
+.status-main{
+  display:flex;
+  justify-content:center;
+  width:100%;
+}
+.status-kind{
+  font-size:11px;
+  font-weight:700;
+  line-height:1.1;
+  color:#4b5563;
+  white-space:pre-line;
+}
+.status-chip{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  width:150px;
+  min-height:54px;
+  padding:8px 10px;
+  border-radius:20px;
+  font-size:11pt;
+  font-weight:700;
+  line-height:1.25;
+  white-space:pre-line;
+  border:1px solid rgba(0,0,0,.08);
+  box-sizing:border-box;
+}
+
+/* メイン色 */
+.st-default{ background:#f3f4f6; color:#111827; }
+
+.st-case{ background:#ff2a2a; color:#fff; }
+.st-case-progress{ background:#ff8a8a; color:#111827; }
+.st-case-done{ background:#e9d5ff; color:#111827; }
+
+.st-doc{ background:#8fd3ff; color:#111827; }
+.st-doc-progress{ background:#003b8e; color:#fff; }
+.st-doc-review{ background:#4aa3ff; color:#fff; }
+.st-doc-done{ background:#9fd8ff; color:#111827; }
+
+.st-internal{ background:#d9f0d1; color:#111827; }
+.st-internal-progress{ background:#0b5cab; color:#fff; }
+.st-internal-wait{ background:#d9c2f0; color:#111827; }
+.st-internal-done{ background:#d8c3e8; color:#111827; }
+
+.st-onsite{ background:#dcecf4; color:#111827; }
+.st-onsite-progress{ background:#0070c0; color:#fff; }
+.st-onsite-done{ background:#d8c3e8; color:#111827; }
+
+.st-warehouse{ background:#e5f3dc; color:#111827; }
+.st-warehouse-progress{ background:#2f7d32; color:#fff; }
+.st-warehouse-done{ background:#cdb4db; color:#111827; }
+
+.st-close{ background:#5b5b5b; color:#fff; }
+.st-cancel{ background:#3f3f3f; color:#fff; }
+.st-hold{ background:#4a4a4a; color:#fff; }
+
+/* 下段ミニアイコン */
+.status-mini-area{
+  display:flex;
+  flex-wrap:nowrap;
+  justify-content:center;
+  align-items:center;
+  gap:4px;
+  width:100%;
+}
+.status-mini{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:2px 7px;
+  border-radius:999px;
+  font-size:10px;
+  line-height:1.2;
+  border:1px solid rgba(0,0,0,.08);
+  background:#f3f4f6;
+  color:#374151;
+  white-space:nowrap;
+}
+.status-mini-label{
+  font-weight:700;
+}
+.status-mini-value{
+  font-weight:600;
+}
+.mini-internal{ background:#eef6ea; }
+.mini-onsite{ background:#ecf4fb; }
+.mini-warehouse{ background:#f3f8ec; }
+</style>

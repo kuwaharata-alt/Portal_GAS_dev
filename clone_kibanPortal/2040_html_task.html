@@ -1,0 +1,38 @@
+<section id="panel-task" class="panel">
+  <div class="task-panel-wrap">
+    <div id="taskList" class="task-list-area"></div>
+
+    <div class="task-entry-bar">
+      <div class="task-entry-grid">
+        <input
+          id="taskName"
+          type="text"
+          class="task-entry-input"
+          placeholder="タスク名"
+        >
+
+        <input
+          id="taskLink"
+          type="text"
+          class="task-entry-input"
+          placeholder="リンク"
+        >
+
+        <input
+          id="taskDate"
+          type="date"
+          class="task-entry-input"
+        >
+
+        <button
+          type="button"
+          id="taskEntrySubmit"
+          class="task-entry-submit"
+          onclick="saveTask()"
+        >
+          登録
+        </button>
+      </div>
+    </div>
+  </div>
+</section>

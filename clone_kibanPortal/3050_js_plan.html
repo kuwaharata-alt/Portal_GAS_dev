@@ -1,0 +1,1576 @@
+<script>
+/* =========================================================
+ * PLAN App JS
+ * - 全体表示をデフォルト
+ * - 個人登録は1画面（左カレンダー / 右編集）
+ * - summaryは簡易表示のみ
+ * - 対象メンバーは 5択
+ *   CL+SV / SV / CL / PSE / PS(CL)
+ * ======================================================= */
+
+window.PlanAppState = window.PlanAppState || {
+  baseYm: '',
+  months: 1,
+  memberName: '',
+  master: {
+    members: [],
+    memberGroups: [],
+    statusList: [],
+    locationList: [],
+    vacationList: [],
+  },
+  personalRows: [],
+  summaryValues: [],
+  holidaySet: new Set(),
+  dirty: false,
+  selectedDateKey: '',
+  selectedHalf: 'am',
+  selectedGroupKeys: ['SV', 'CL'],
+  loginName: '',
+};
+
+window.__planInitialized = false;
+window.__planEventsBound = false;
+
+/* =========================================================
+ * Helpers
+ * ======================================================= */
+
+const $pid = (id) => document.getElementById(id);
+const nz = (v) => String(v ?? '').trim();
+
+function escHtml(str){
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function ymFromInputValue(v){
+  if (!v) return '';
+  const s = String(v).trim();
+
+  if (s.includes('-')) {
+    const [y, m] = s.split('-');
+    return `${y}/${String(m).padStart(2, '0')}`;
+  }
+
+  if (s.includes('/')) {
+    const [y, m] = s.split('/');
+    return `${y}/${String(m).padStart(2, '0')}`;
+  }
+
+  return '';
+}
+
+function inputValueFromYm(ym){
+  if (!ym) return '';
+  const [y, m] = String(ym).split('/');
+  return `${y}-${m}`;
+}
+
+function weekdayJa(date){
+  const arr = ['日', '月', '火', '水', '木', '金', '土'];
+  return arr[new Date(date).getDay()] || '';
+}
+
+function formatDateKeyForClient_(d){
+  const dt = new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const day = String(dt.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
+
+function getTodayYm(){
+  const d = new Date();
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getTodayKey_(){
+  return formatDateKeyForClient_(new Date());
+}
+
+function formatMd_(dateKey){
+  const d = new Date(dateKey);
+  if (isNaN(d)) return dateKey;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function formatPlanDateLabel_(dateKey){
+  const d = new Date(dateKey);
+  if (isNaN(d)) return String(dateKey || '');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const w = weekdayJa(dateKey);
+  return `${y}/${m}/${day}（${w}）`;
+}
+
+function createOptionHtml(list, val, ph = ''){
+  let html = `<option value="">${escHtml(ph)}</option>`;
+  (list || []).forEach(v => {
+    const s = String(v) === String(val) ? ' selected' : '';
+    html += `<option value="${escHtml(v)}"${s}>${escHtml(v)}</option>`;
+  });
+  return html;
+}
+
+function confirmPlanDiscardIfDirty(){
+  if (!window.PlanAppState.dirty) return true;
+  return window.confirm('未保存の変更があります。続行しますか？');
+}
+
+function makeEmptyPlanRow_(dateKey){
+  return {
+    date: dateKey,
+    week: weekdayJa(dateKey),
+    amStatus: '',
+    amLocation: '',
+    amVacation: '',
+    amCustomer: '',
+    pmStatus: '',
+    pmLocation: '',
+    pmVacation: '',
+    pmCustomer: '',
+  };
+}
+
+function getPersonalRowByDate_(dateKey){
+  const rows = window.PlanAppState.personalRows || [];
+  let row = rows.find(r => String(r.date) === String(dateKey));
+
+  if (!row) {
+    row = makeEmptyPlanRow_(dateKey);
+    rows.push(row);
+    rows.sort((a, b) => new Date(a.date) - new Date(b.date));
+    window.PlanAppState.personalRows = rows;
+  }
+
+  return row;
+}
+
+function getPlanRowByDate_(dateKey){
+  return getPersonalRowByDate_(dateKey);
+}
+
+function hasSummaryTable_(){
+  return !!($pid('planSummaryHead') && $pid('planSummaryBody'));
+}
+
+/* =========================================================
+ * Meta / Status
+ * ======================================================= */
+
+function setPlanMeta_(msg){
+  if (typeof window.setMeta === 'function') {
+    window.setMeta(msg || '');
+    return;
+  }
+  const el = document.getElementById('meta');
+  if (el) el.textContent = msg || '';
+}
+
+function setPlanErr_(msg){
+  if (typeof window.setErr === 'function') {
+    window.setErr(msg || '');
+    return;
+  }
+  const el = document.getElementById('meta');
+  if (el) el.textContent = msg || '';
+}
+
+function setPlanModalStatusLine_(msg){
+  const el = $pid('planModalStatusLine');
+  if (el) el.textContent = msg || '';
+}
+
+function buildSummaryMetaText_(ym, months, values){
+  const count = Math.max(0, (values?.length || 0) - 1);
+  return `予定管理：${ym} / ${months}か月 / ${count}日分`;
+}
+
+function buildPersonalMetaText_(member, ym, months, rows){
+  const count = rows?.length || 0;
+  return `個人予定：${member} / ${ym} / ${months}か月 / ${count}件`;
+}
+
+/* =========================================================
+ * Holiday / row helpers
+ * ======================================================= */
+
+function isHoliday(dateKey){
+  return window.PlanAppState.holidaySet.has(String(dateKey || '').trim());
+}
+
+function rowClassByDate(dateKey){
+  const d = new Date(dateKey);
+  if (isHoliday(dateKey) || d.getDay() === 0) return 'plan-row-holiday';
+  if (d.getDay() === 6) return 'plan-row-sat';
+  return '';
+}
+
+/* =========================================================
+ * GAS wrapper
+ * ======================================================= */
+
+function gasCall_(fn, ...args){
+  return new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler((e) => reject(new Error(e?.message || e)))
+      [fn](...args);
+  });
+}
+
+/* =========================================================
+ * Entry
+ * ======================================================= */
+
+async function loadPlan_(){
+  if (window.__planInitialized) return;
+
+  try {
+    window.__planInitialized = true;
+    await initPlanApp_();
+  } catch (err) {
+    window.__planInitialized = false;
+    console.error(err);
+    setPlanErr_(err?.message || '予定管理の初期化に失敗しました');
+  }
+}
+
+/* =========================================================
+ * Init
+ * ======================================================= */
+function renderPlanSummarySkeleton_(){
+  const head = $pid('planSummaryHead');
+  const body = $pid('planSummaryBody');
+  const table = $pid('planSummaryTable');
+  if (!head || !body || !table) return;
+
+  table.classList.remove('is-detail');
+  table.classList.add('is-compact');
+
+  head.innerHTML = `
+    <tr>
+      <th class="plan-summary-date-merged" colspan="2">日付</th>
+      <th class="plan-summary-cell">読込中...</th>
+      <th class="plan-summary-cell"></th>
+      <th class="plan-summary-cell"></th>
+      <th class="plan-summary-cell"></th>
+      <th class="plan-summary-cell"></th>
+      <th class="plan-summary-cell"></th>
+    </tr>
+  `;
+
+  body.innerHTML = Array.from({ length: 8 }).map(() => `
+    <tr>
+      <td class="plan-summary-date">----</td>
+      <td class="plan-summary-value plan-text-center">-</td>
+      <td class="plan-summary-cell"></td>
+      <td class="plan-summary-cell"></td>
+      <td class="plan-summary-cell"></td>
+      <td class="plan-summary-cell"></td>
+      <td class="plan-summary-cell"></td>
+      <td class="plan-summary-cell"></td>
+    </tr>
+  `).join('');
+}
+
+async function initPlanApp_(){
+  bindPlanEvents_();
+
+  const ym = getTodayYm();
+  window.PlanAppState.baseYm = ym;
+  window.PlanAppState.months = Number($pid('planRange2')?.value || $pid('planRange')?.value || '1');
+
+  if ($pid('planTargetMonth'))  $pid('planTargetMonth').value = inputValueFromYm(ym);
+  if ($pid('planTargetMonth2')) $pid('planTargetMonth2').value = inputValueFromYm(ym);
+
+  setPlanMeta_('予定管理を初期化中...');
+  setPlanErr_('');
+
+  if (hasSummaryTable_()) {
+    renderPlanSummarySkeleton_(); // 先に枠だけ出す
+  }
+
+  const res = await gasCall_('api_getPlanInitContext');
+  if (!res?.ok) throw new Error(res?.error || '初期化に失敗しました');
+
+  window.PlanAppState.master = {
+    members: res.members || [],
+    memberGroups: res.memberGroups || [],
+    statusList: res.statusList || [],
+    locationList: res.locationList || [],
+    vacationList: res.vacationList || [],
+  };
+
+  window.PlanAppState.loginName = res.loginName || '';
+
+  populatePlanMemberSelect_();
+  populateInlineEditorSelects_();
+  bindVacationFieldControl_();
+  renderPlanMemberFilterPop_();
+
+  window.PlanAppState.selectedGroupKeys = ['SV', 'CL'];
+  updatePlanMemberFilterButtonText_();
+
+  const member = res.defaultMember || '';
+  window.PlanAppState.memberName = member;
+  if (member && $pid('planMember')) {
+    $pid('planMember').value = member;
+  }
+
+  resetInlineEditor_();
+
+  // 祝日は後回しで並列気味に扱う
+  gasCall_('api_getPlanHolidayList')
+    .then(holidayRes => {
+      if (holidayRes?.ok) {
+        window.PlanAppState.holidaySet = new Set(holidayRes.dates || []);
+        if (window.PlanAppState.summaryValues?.length) {
+          renderPlanSummaryTable_(window.PlanAppState.summaryValues);
+        }
+      }
+    })
+    .catch(console.error);
+
+  if (hasSummaryTable_()) {
+    await loadPlanSummary_();
+  } else {
+    setPlanMeta_(`予定管理：${ym} / ${window.PlanAppState.months}か月`);
+  }
+}
+
+/* =========================================================
+ * Events
+ * ======================================================= */
+
+function bindPlanEvents_(){
+  if (window.__planEventsBound) return;
+  window.__planEventsBound = true;
+
+  $pid('planTargetMonth2')?.addEventListener('change', () => {
+    loadPlanSummary_().catch(err => {
+      console.error(err);
+      setPlanErr_(err?.message || '全体表示の再読込に失敗しました');
+    });
+  });
+
+  $pid('planRange2')?.addEventListener('change', () => {
+    loadPlanSummary_().catch(err => {
+      console.error(err);
+      setPlanErr_(err?.message || '全体表示の再読込に失敗しました');
+    });
+  });
+
+  $pid('btnOpenPlanPersonal')?.addEventListener('click', async () => {
+    if (!confirmPlanDiscardIfDirty()) return;
+    try {
+      await openPlanPersonalModal_();
+    } catch (err) {
+      console.error(err);
+      setPlanErr_(err?.message || '個人予定画面の表示に失敗しました');
+    }
+  });
+
+  $pid('btnClosePlanPersonal')?.addEventListener('click', closePlanPersonalModal_);
+
+  $pid('planPersonalModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'planPersonalModal') {
+      closePlanPersonalModal_();
+    }
+  });
+
+  $pid('planTargetMonth')?.addEventListener('change', async () => {
+    if (!confirmPlanDiscardIfDirty()) {
+      $pid('planTargetMonth').value = inputValueFromYm(window.PlanAppState.baseYm || getTodayYm());
+      return;
+    }
+    try {
+      await loadPlanPersonal_();
+    } catch (err) {
+      console.error(err);
+      setPlanErr_(err?.message || '個人予定の再読込に失敗しました');
+    }
+  });
+
+  $pid('planMember')?.addEventListener('change', async () => {
+    if (!confirmPlanDiscardIfDirty()) {
+      $pid('planMember').value = window.PlanAppState.memberName || '';
+      return;
+    }
+    try {
+      await loadPlanPersonal_();
+    } catch (err) {
+      console.error(err);
+      setPlanErr_(err?.message || '個人予定の再読込に失敗しました');
+    }
+  });
+
+  $pid('btnPlanSavePersonal')?.addEventListener('click', () => {
+    savePlanPersonal_().catch(err => {
+      console.error(err);
+      setPlanErr_(err?.message || '保存に失敗しました');
+      setPlanModalStatusLine_('保存に失敗しました');
+    });
+  });
+
+  $pid('btnPlanDaySave')?.addEventListener('click', savePlanDayEditorInline_);
+  $pid('btnPlanDayClear')?.addEventListener('click', clearPlanDayEditorInline_);
+
+  $pid('btnPlanMemberFilter')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePlanMemberFilterPop_();
+  });
+
+  document.addEventListener('click', (e) => {
+    const pop = $pid('planMemberFilterPop');
+    const btn = $pid('btnPlanMemberFilter');
+    if (!pop || !btn) return;
+    if (pop.hidden) return;
+    if (pop.contains(e.target) || btn.contains(e.target)) return;
+    pop.hidden = true;
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+
+    if ($pid('planPersonalModal')?.classList.contains('is-open')) {
+      closePlanPersonalModal_();
+      return;
+    }
+
+    const pop = $pid('planMemberFilterPop');
+    if (pop && !pop.hidden) {
+      pop.hidden = true;
+    }
+  });
+
+  $pid('btnPlanCalSync')?.addEventListener('click', async () => {
+    const st = window.PlanAppState;
+    if (!st.memberName) {
+      setPlanModalStatusLine_('メンバー未選択');
+      return;
+    }
+
+    try {
+      setPlanModalStatusLine_('カレンダー同期中...');
+      setPlanErr_('');
+
+      const res = await gasCall_('api_syncMemberMonthPlanCalendar', {
+        memberName: st.memberName
+      });
+
+      if (!res?.ok) {
+        throw new Error(res?.error || 'カレンダー同期に失敗しました');
+      }
+
+      await loadPlanPersonal_();
+      setPlanModalStatusLine_(`カレンダー同期完了: ${res.count || 0}件`);
+      setPlanMeta_(`カレンダー同期しました：${st.memberName}`);
+    } catch (err) {
+      console.error(err);
+      setPlanErr_(err?.message || 'カレンダー同期に失敗しました');
+      setPlanModalStatusLine_('カレンダー同期に失敗しました');
+    }
+  });
+
+  $pid('btnPlanPrevMonth')?.addEventListener('click', async () => {
+    if (!confirmPlanDiscardIfDirty()) return;
+
+    try {
+      const currentYm = ymFromInputValue($pid('planTargetMonth')?.value || '') || window.PlanAppState.baseYm || getTodayYm();
+      const nextYm = shiftYm_(currentYm, -1);
+
+      if ($pid('planTargetMonth')) {
+        $pid('planTargetMonth').value = inputValueFromYm(nextYm);
+      }
+
+      await loadPlanPersonal_();
+    } catch (err) {
+      console.error(err);
+      setPlanErr_(err?.message || '前月の読込に失敗しました');
+    }
+  });
+
+  $pid('btnPlanNextMonth')?.addEventListener('click', async () => {
+    if (!confirmPlanDiscardIfDirty()) return;
+
+    try {
+      const currentYm = ymFromInputValue($pid('planTargetMonth')?.value || '') || window.PlanAppState.baseYm || getTodayYm();
+      const nextYm = shiftYm_(currentYm, 1);
+
+      if ($pid('planTargetMonth')) {
+        $pid('planTargetMonth').value = inputValueFromYm(nextYm);
+      }
+
+      await loadPlanPersonal_();
+    } catch (err) {
+      console.error(err);
+      setPlanErr_(err?.message || '翌月の読込に失敗しました');
+    }
+  });
+
+}
+
+/* =========================================================
+ * Master
+ * ======================================================= */
+
+function populatePlanMemberSelect_(){
+  const el = $pid('planMember');
+  if (!el) return;
+
+  const members = window.PlanAppState.master.members || [];
+  el.innerHTML =
+    '<option value="">選択してください</option>' +
+    members.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+}
+
+function populateInlineEditorSelects_(){
+  const { statusList, locationList, vacationList } = window.PlanAppState.master;
+
+  if ($pid('planDayAmStatus')) {
+    $pid('planDayAmStatus').innerHTML = createOptionHtml(statusList, '', '未選択');
+  }
+  if ($pid('planDayAmLocation')) {
+    $pid('planDayAmLocation').innerHTML = createOptionHtml(locationList, '', '選択してください');
+  }
+  if ($pid('planDayAmVacation')) {
+    $pid('planDayAmVacation').innerHTML = createOptionHtml(vacationList, '', '選択してください');
+  }
+
+  if ($pid('planDayPmStatus')) {
+    $pid('planDayPmStatus').innerHTML = createOptionHtml(statusList, '', '未選択');
+  }
+  if ($pid('planDayPmLocation')) {
+    $pid('planDayPmLocation').innerHTML = createOptionHtml(locationList, '', '選択してください');
+  }
+  if ($pid('planDayPmVacation')) {
+    $pid('planDayPmVacation').innerHTML = createOptionHtml(vacationList, '', '選択してください');
+  }
+}
+
+/* =========================================================
+ * Personal Modal
+ * ======================================================= */
+
+async function openPlanPersonalModal_(){
+  const modal = $pid('planPersonalModal');
+  if (!modal) return;
+
+  if ($pid('planTargetMonth')) {
+    $pid('planTargetMonth').value = inputValueFromYm(window.PlanAppState.baseYm || getTodayYm());
+  }
+  if ($pid('planMember') && window.PlanAppState.memberName) {
+    $pid('planMember').value = window.PlanAppState.memberName;
+  }
+
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+
+  setPlanModalStatusLine_('個人予定を読み込み中...');
+  await loadPlanPersonal_();
+}
+
+function closePlanPersonalModal_(){
+  const modal = $pid('planPersonalModal');
+  if (!modal) return;
+
+  if (window.PlanAppState.dirty) {
+    const ok = window.confirm('未保存の変更があります。閉じますか？');
+    if (!ok) return;
+  }
+
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+/* =========================================================
+ * Personal
+ * ======================================================= */
+
+async function loadPlanPersonal_(){
+  const st = window.PlanAppState;
+  const member = $pid('planMember')?.value || st.memberName || '';
+  const ym = ymFromInputValue($pid('planTargetMonth')?.value || '') || getTodayYm();
+  const months = 1;
+
+  st.memberName = member;
+  st.baseYm = ym;
+  st.months = months;
+
+  if (!member) {
+    renderPlanPersonalCalendar_([]);
+    resetInlineEditor_();
+    setPlanMeta_('予定管理：メンバーを選択してください');
+    setPlanModalStatusLine_('メンバーを選択してください');
+    return;
+  }
+
+  setPlanMeta_(`個人予定を読込中：${member} / ${ym} / ${months}か月`);
+  setPlanModalStatusLine_(`${member} を読み込み中...`);
+  setPlanErr_('');
+
+  const res = await gasCall_('api_getMemberMonthPlan', member, ym, months);
+
+  if (!res?.ok) {
+    throw new Error(res?.error || '個人予定の取得に失敗しました');
+  }
+
+  st.personalRows = res.data || [];
+  st.dirty = false;
+
+  renderPlanPersonalCalendar_(st.personalRows);
+
+  const metaText = buildPersonalMetaText_(member, ym, months, st.personalRows);
+  setPlanMeta_(metaText);
+  setPlanModalStatusLine_(metaText);
+
+  autoSelectInitialDate_();
+}
+
+/* =========================================================
+ * Calendar matrix
+ * ======================================================= */
+
+function buildPlanCalendarMatrix_(baseYm, rows, months = 1){
+  const map = {};
+
+  (rows || []).forEach(r => {
+    map[String(r.date)] = r;
+  });
+
+  const [y, m] = String(baseYm).split('/').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const last  = new Date(y, m - 1 + Number(months), 0);
+
+  const weeks = [];
+
+  // 1か月表示だけは「月内のみ表示」
+  if (Number(months) === 1) {
+    const firstDow = first.getDay(); // 0=日
+    const lastDate = last.getDate();
+
+    let dayNo = 1;
+    let finished = false;
+
+    while (!finished) {
+      const week = [];
+
+      for (let i = 0; i < 7; i++) {
+        if (weeks.length === 0 && i < firstDow) {
+          week.push({
+            date: '',
+            inMonth: false,
+            empty: true,
+            row: null,
+          });
+          continue;
+        }
+
+        if (dayNo > lastDate) {
+          week.push({
+            date: '',
+            inMonth: false,
+            empty: true,
+            row: null,
+          });
+          finished = true;
+          continue;
+        }
+
+        const d = new Date(y, m - 1, dayNo);
+        const key = formatDateKeyForClient_(d);
+
+        week.push({
+          date: key,
+          inMonth: true,
+          empty: false,
+          row: map[key] || makeEmptyPlanRow_(key),
+        });
+
+        dayNo++;
+      }
+
+      weeks.push(week);
+
+      if (dayNo > lastDate) {
+        break;
+      }
+    }
+
+    return weeks;
+  }
+
+  // 2か月以上は従来通り
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+
+  const end = new Date(last);
+  end.setDate(last.getDate() + (6 - last.getDay()));
+
+  let cur = new Date(start);
+
+  while (cur <= end) {
+    const week = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(cur);
+      const key = formatDateKeyForClient_(d);
+
+      week.push({
+        date: key,
+        inMonth: d >= first && d <= last,
+        empty: false,
+        row: map[key] || makeEmptyPlanRow_(key),
+      });
+
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    weeks.push(week);
+  }
+
+  return weeks;
+}
+
+/* =========================================================
+ * Personal calendar render
+ * ======================================================= */
+
+function renderPlanPersonalCalendar_(rows){
+  const head = $pid('planCalendarHead');
+  const body = $pid('planCalendarBody');
+
+  if (!head || !body) return;
+
+  const ym = window.PlanAppState.baseYm || getTodayYm();
+  const weeks = buildPlanCalendarMatrix_(ym, rows, Number(window.PlanAppState.months || 1));
+  const weekNames = ['日', '月', '火', '水', '木', '金', '土'];
+  const todayKey = getTodayKey_();
+
+  head.innerHTML = `
+    <tr>
+      ${weekNames.map(w => `<th class="plan-cal-head">${w}</th>`).join('')}
+    </tr>
+  `;
+
+  body.innerHTML = weeks.map(week => `
+    <tr>
+      ${week.map(day => {
+        if (day.empty) {
+          return `<td class="plan-cal-day is-empty"></td>`;
+        }
+        const r = day.row || {};
+        const rowCls = rowClassByDate(day.date);
+
+        const cls = [
+          'plan-cal-day',
+          !day.inMonth ? 'is-other-month' : '',
+          rowCls,
+          day.date === todayKey ? 'is-today' : ''
+        ].filter(Boolean).join(' ');
+
+        return `
+          <td class="${cls}" data-date="${escHtml(day.date)}">
+            <div class="plan-cal-date">
+              <span class="plan-cal-date-num">${escHtml(formatMd_(day.date))}</span>
+            </div>
+
+            <div class="plan-cal-lines">
+              ${renderPlanCompactHalfLine_(
+                day.date,
+                'am',
+                r.amStatus, r.amLocation, r.amVacation, r.amCustomer,
+                r.amEventId, r.amSyncStatus, r.amSyncAt
+              )}
+              ${renderPlanCompactHalfLine_(
+                day.date,
+                'pm',
+                r.pmStatus, r.pmLocation, r.pmVacation, r.pmCustomer,
+                r.pmEventId, r.pmSyncStatus, r.pmSyncAt
+              )}
+            </div>
+          </td>
+        `;
+      }).join('')}
+    </tr>
+  `).join('');
+
+  bindPlanCalendarClicks_();
+  highlightSelectedSlot_(window.PlanAppState.selectedDateKey, window.PlanAppState.selectedHalf);
+}
+
+function bindPlanCalendarClicks_(){
+  document.querySelectorAll('#planCalendarBody .plan-cal-line').forEach(el => {
+    el.onclick = () => {
+      const date = el.dataset.date;
+      const half = el.dataset.half || 'am';
+      openDayEditorInline_(date, half);
+    };
+  });
+}
+
+function renderPlanCompactHalfLine_(dateKey, half, status, location, vacation, customer, eventId = '', syncStatus = '', syncAt = ''){
+  const tagHtml = renderPlanHalfMainTag_(status, location, vacation);
+  const customerHtml = nz(customer)
+    ? `<span class="plan-cal-customer-inline">＠${escHtml(customer)}</span>`
+    : '';
+
+  const syncInfo = getSyncStateInfo_({
+    status,
+    eventId,
+    syncStatus,
+    syncAt,
+  });
+
+  const syncIconHtml = syncInfo.icon
+    ? `<span class="plan-sync-icon ${syncInfo.icon === '✓' ? 'is-done' : 'is-alert'}" title="${escHtml(syncInfo.iconTitle)}">${syncInfo.icon}</span>`
+    : '';
+
+  return `
+    <div class="plan-cal-line ${syncInfo.targetClass}" data-date="${escHtml(dateKey)}" data-half="${escHtml(half)}">
+      <div class="plan-cal-line-side">
+        ${half.toUpperCase()}
+        ${syncIconHtml}
+      </div>
+      <div class="plan-cal-line-main">
+        <div class="plan-cal-main-left">
+          ${tagHtml}
+        </div>
+        <div class="plan-cal-main-right">
+          ${customerHtml}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPlanHalfMainTag_(status, location, vacation){
+  const st  = nz(status);
+  const loc = nz(location);
+  const vac = nz(vacation);
+
+  if (st === '休暇') {
+    return `<span class="plan-chip is-vacation">${escHtml(vac || '休暇')}</span>`;
+  }
+
+  if (loc) {
+    return `<span class="plan-chip ${getPlanTagClass_(loc)}">${escHtml(loc)}</span>`;
+  }
+
+  if (st) {
+    return `<span class="plan-chip is-default">${escHtml(st)}</span>`;
+  }
+
+  return `<span class="plan-cal-empty">-</span>`;
+}
+
+/* =========================================================
+ * Inline day editor
+ * ======================================================= */
+
+function resetInlineEditor_(){
+  window.PlanAppState.selectedDateKey = '';
+  window.PlanAppState.selectedHalf = 'am';
+
+  const labelEl = $pid('planSelectedDateLabel');
+  if (labelEl) {
+    labelEl.textContent = '日付を選択してください';
+  }
+
+  if ($pid('planDayAmStatus'))   $pid('planDayAmStatus').value = '';
+  if ($pid('planDayAmLocation')) $pid('planDayAmLocation').value = '';
+  if ($pid('planDayAmVacation')) $pid('planDayAmVacation').value = '';
+  if ($pid('planDayAmCustomer')) $pid('planDayAmCustomer').value = '';
+
+  if ($pid('planDayPmStatus'))   $pid('planDayPmStatus').value = '';
+  if ($pid('planDayPmLocation')) $pid('planDayPmLocation').value = '';
+  if ($pid('planDayPmVacation')) $pid('planDayPmVacation').value = '';
+  if ($pid('planDayPmCustomer')) $pid('planDayPmCustomer').value = '';
+
+  toggleVacationFieldByLocation_('planDayAmLocation', 'planDayAmVacation');
+  toggleVacationFieldByLocation_('planDayPmLocation', 'planDayPmVacation');
+
+  highlightSelectedSlot_('', '');
+}
+
+function autoSelectInitialDate_(){
+  const st = window.PlanAppState;
+  const todayKey = getTodayKey_();
+
+  const hasToday = (st.personalRows || []).some(r => String(r.date) === String(todayKey));
+  const targetDate = hasToday
+    ? todayKey
+    : (st.personalRows?.[0]?.date || getFirstVisibleCalendarDate_());
+
+  if (!targetDate) {
+    resetInlineEditor_();
+    return;
+  }
+
+  openDayEditorInline_(targetDate, 'am');
+}
+
+function getFirstVisibleCalendarDate_(){
+  const el = document.querySelector('#planCalendarBody .plan-cal-line');
+  return el?.dataset?.date || '';
+}
+
+function openDayEditorInline_(dateKey, half){
+  const st = window.PlanAppState;
+  st.selectedDateKey = dateKey;
+  st.selectedHalf = half || 'am';
+
+  const labelEl = $pid('planSelectedDateLabel');
+  if (labelEl) {
+    labelEl.textContent = formatPlanDateLabel_(dateKey);
+  }
+
+  loadDayValuesToEditor_(dateKey);
+  highlightSelectedSlot_(dateKey, half);
+
+  if ((half || 'am') === 'pm') {
+    $pid('planDayPmStatus')?.focus();
+  } else {
+    $pid('planDayAmStatus')?.focus();
+  }
+}
+
+function loadDayValuesToEditor_(dateKey){
+  const row = getPlanRowByDate_(dateKey) || {};
+
+  if ($pid('planDayAmStatus'))   $pid('planDayAmStatus').value = row.amStatus || '';
+  if ($pid('planDayAmLocation')) $pid('planDayAmLocation').value = row.amLocation || '';
+  if ($pid('planDayAmVacation')) $pid('planDayAmVacation').value = row.amVacation || '';
+  if ($pid('planDayAmCustomer')) $pid('planDayAmCustomer').value = row.amCustomer || '';
+
+  if ($pid('planDayPmStatus'))   $pid('planDayPmStatus').value = row.pmStatus || '';
+  if ($pid('planDayPmLocation')) $pid('planDayPmLocation').value = row.pmLocation || '';
+  if ($pid('planDayPmVacation')) $pid('planDayPmVacation').value = row.pmVacation || '';
+  if ($pid('planDayPmCustomer')) $pid('planDayPmCustomer').value = row.pmCustomer || '';
+
+  toggleVacationFieldByLocation_('planDayAmLocation', 'planDayAmVacation');
+  toggleVacationFieldByLocation_('planDayPmLocation', 'planDayPmVacation');
+}
+
+function highlightSelectedSlot_(dateKey, half){
+  document.querySelectorAll('#planCalendarBody .plan-cal-line').forEach(el => {
+    const sameDate = String(el.dataset.date || '') === String(dateKey || '');
+    const sameHalf = String(el.dataset.half || '') === String(half || '');
+    el.classList.toggle('is-active', sameDate && sameHalf);
+  });
+}
+
+function savePlanDayEditorInline_(){
+  const dateKey = window.PlanAppState.selectedDateKey;
+  if (!dateKey) {
+    alert('日付を選択してください');
+    return;
+  }
+
+  applyCurrentEditorToSelectedDate_(true);
+}
+
+function clearPlanDayEditorInline_(){
+  if (!$pid('planDayAmStatus')) return;
+
+  $pid('planDayAmStatus').value = '';
+  $pid('planDayAmLocation').value = '';
+  $pid('planDayAmVacation').value = '';
+  $pid('planDayAmCustomer').value = '';
+
+  $pid('planDayPmStatus').value = '';
+  $pid('planDayPmLocation').value = '';
+  $pid('planDayPmVacation').value = '';
+  $pid('planDayPmCustomer').value = '';
+}
+
+/* =========================================================
+ * Save
+ * ======================================================= */
+
+async function savePlanPersonal_(){
+  const st = window.PlanAppState;
+
+  if (!st.memberName) {
+    setPlanErr_('メンバーが選択されていません');
+    setPlanModalStatusLine_('メンバー未選択');
+    return;
+  }
+
+  // いま右側で編集中の内容を、保存時は自動で反映扱いにする
+  applyCurrentEditorToSelectedDate_(false);
+
+  setPlanMeta_(`保存中：${st.memberName}`);
+  setPlanModalStatusLine_('シート保存中...');
+  setPlanErr_('');
+
+  const saveRes = await gasCall_('api_saveMemberMonthPlanFast', {
+    memberName: st.memberName,
+    rows: st.personalRows
+  });
+
+  if (!saveRes?.ok) {
+    throw new Error(saveRes?.error || '保存に失敗しました');
+  }
+
+  st.dirty = false;
+
+  setPlanModalStatusLine_('一覧更新中...');
+  await loadPlanSummary_();   // ← 追加
+  closePlanPersonalModal_();
+  setPlanMeta_(`保存しました：${st.memberName}`);
+}
+
+/* =========================================================
+ * Summary
+ * ======================================================= */
+
+async function loadPlanSummary_(){
+  if (!hasSummaryTable_()) {
+    const ym = ymFromInputValue($pid('planTargetMonth2')?.value || '') || getTodayYm();
+    const months = Number($pid('planRange2')?.value || '1');
+    window.PlanAppState.baseYm = ym;
+    window.PlanAppState.months = months;
+    setPlanMeta_(`予定管理：${ym} / ${months}か月`);
+    return;
+  }
+
+  const st = window.PlanAppState;
+
+  const ym = ymFromInputValue($pid('planTargetMonth2')?.value || '') || getTodayYm();
+  const months = Number($pid('planRange2')?.value || '1');
+
+  st.baseYm = ym;
+  st.months = months;
+
+  setPlanMeta_(`全体予定を読込中：${ym} / ${months}か月`);
+  setPlanErr_('');
+
+  const res = await gasCall_('api_getSummaryView', ym, months);
+
+  if (!res?.ok) {
+    throw new Error(res?.error || '全体表示の取得に失敗しました');
+  }
+
+  st.summaryValues = res.values || [];
+
+  renderPlanMemberFilterPop_();
+  updatePlanMemberFilterButtonText_();
+  renderPlanSummaryTable_(st.summaryValues);
+
+  const metaText = buildSummaryMetaText_(ym, months, st.summaryValues);
+  setPlanMeta_(metaText);
+}
+
+function renderPlanSummaryTable_(values){
+  const head = $pid('planSummaryHead');
+  const body = $pid('planSummaryBody');
+  const table = $pid('planSummaryTable');
+
+  if (!head || !body || !table) return;
+
+  table.classList.remove('is-detail');
+  table.classList.add('is-compact');
+
+  try {
+    console.log('render values =', values);
+
+    if (!Array.isArray(values) || !values.length) {
+      head.innerHTML = '';
+      body.innerHTML = `
+        <tr>
+          <td colspan="99" class="plan-text-center plan-muted" style="padding:16px;">
+            データがありません
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    const header = Array.isArray(values[0]) ? values[0] : [];
+    const rows = values.slice(1).filter(r => Array.isArray(r));
+
+    console.log('summary header raw =', header);
+    console.log('summary rows count =', rows.length);
+
+    if (!header.length) {
+      head.innerHTML = '';
+      body.innerHTML = `
+        <tr>
+          <td colspan="99" class="plan-text-center plan-muted" style="padding:16px;">
+            ヘッダーが取得できません
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    const memberHeaders = header.slice(2);
+    const visibleMembers = getVisibleMemberHeaders_(memberHeaders);
+    const indexMap = getMemberIndexMap_(header);
+
+    const allMembers = memberHeaders.slice();
+    const renderMembers = visibleMembers.slice();
+    const emptyColCount = Math.max(0, allMembers.length - renderMembers.length);
+    const fillerMembers = Array.from({ length: emptyColCount }, (_, i) => `__empty__${i}`);
+    const displayMembers = renderMembers.concat(fillerMembers);
+
+    console.log('visible member count =', visibleMembers.length);
+    console.log('visible members =', visibleMembers);
+
+    head.innerHTML =
+      '<tr>' +
+        `<th class="plan-summary-date-merged" colspan="2">日付</th>` +
+        displayMembers.map(h => {
+          if (String(h).startsWith('__empty__')) {
+            return `<th class="plan-summary-cell is-blank"></th>`;
+          }
+          const myCls = isMyMemberColumn_(h) ? ' is-me' : '';
+          return `<th class="plan-summary-cell${myCls}">${escHtml(h)}</th>`;
+        }).join('') +
+      '</tr>';
+
+    if (!rows.length) {
+      body.innerHTML = `
+        <tr>
+          <td colspan="${Math.max(displayMembers.length + 2, 3)}"
+              class="plan-text-center plan-muted"
+              style="padding:16px;">
+            対象期間のデータがありません
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    if (!visibleMembers.length) {
+      body.innerHTML = rows.map(r => {
+        const cls = rowClassByDate(r[0]);
+        const blankCells = displayMembers.map(() => {
+          return `<td class="plan-summary-cell is-blank"></td>`;
+        }).join('');
+
+        return `
+          <tr class="${cls}">
+            <td class="plan-summary-date">${escHtml(r[0] || '')}</td>
+            <td class="plan-summary-value plan-text-center">${escHtml(r[1] || '')}</td>
+            ${blankCells}
+          </tr>
+        `;
+      }).join('');
+      return;
+    }
+
+    body.innerHTML = rows.map((r, rowIdx) => {
+      const cls = rowClassByDate(r[0]);
+
+      const fixed = `
+        <td class="plan-summary-date">${escHtml(r[0] || '')}</td>
+        <td class="plan-summary-value plan-text-center">${escHtml(r[1] || '')}</td>
+      `;
+
+      const cells = displayMembers.map(name => {
+        if (String(name).startsWith('__empty__')) {
+          return `<td class="plan-summary-cell is-blank"></td>`;
+        }
+
+        const idx = indexMap[name];
+        const cell = idx != null ? r[idx] : '';
+        const myCls = isMyMemberColumn_(name) ? ' is-me' : '';
+
+        try {
+          return `<td class="plan-summary-cell${myCls}">${renderSummaryCellCompactHtml_(cell, r[0])}</td>`;
+        } catch (e) {
+          console.error('cell render error', { rowIdx, name, idx, cell, e });
+          return `<td class="plan-summary-cell plan-text-center${myCls}">ERR</td>`;
+        }
+      }).join('');
+
+      return `<tr class="${cls}">${fixed}${cells}</tr>`;
+    }).join('');
+
+    console.log('summary render complete');
+  } catch (e) {
+    console.error('renderPlanSummaryTable_ error', e);
+
+    head.innerHTML = '';
+    body.innerHTML = `
+      <tr>
+        <td colspan="99" class="plan-text-center" style="padding:16px; color:#b91c1c;">
+          一覧描画でエラーが発生しました
+        </td>
+      </tr>
+    `;
+  }
+}
+
+/* =========================================================
+ * Summary render helpers
+ * ======================================================= */
+
+function renderSummaryCellHtml_(cell, dateKey){
+  const text = nz(cell);
+  if (!text) return '';
+
+  const d = new Date(dateKey);
+  const isWeekend =
+    isHoliday(dateKey) ||
+    d.getDay() === 0 ||
+    d.getDay() === 6;
+
+  let html = escHtml(text)
+    .replace(/AM：/g, '<span class="plan-half-label">AM：</span>')
+    .replace(/PM：/g, '<span class="plan-half-label">PM：</span>');
+
+  html = html.replace(/\[\[TAG:([^\]]+)\]\]/g, (_, tag) => {
+    const cls = getPlanTagClass_(tag);
+
+    if (cls === 'is-vacation' && isWeekend) {
+      return `<span class="plan-chip is-vacation-weekend">${escHtml(tag)}</span>`;
+    }
+
+    return `<span class="plan-chip ${cls}">${escHtml(tag)}</span>`;
+  });
+
+  html = html.replace(/＠([^\s<br>]+)/g, '<span class="plan-note">＠$1</span>');
+  return html.replace(/\n/g, '<br>');
+}
+
+function getPlanTagClass_(tag){
+  const t = nz(tag);
+
+  if (/本社/.test(t)) return 'is-honsya';
+  if (/柏倉庫/.test(t)) return 'is-kashiwa';
+  if (/矢倉倉庫/.test(t)) return 'is-yakura';
+  if (/現地/.test(t)) return 'is-client';
+  if (/休暇/.test(t)) return 'is-vacation';
+
+  return 'is-default';
+}
+
+function toggleVacationFieldByLocation_(locationId, vacationId){
+  const locationEl = $pid(locationId);
+  const vacationEl = $pid(vacationId);
+  if (!locationEl || !vacationEl) return;
+
+  const isVacation = String(locationEl.value || '').trim() === '休暇';
+
+  vacationEl.disabled = !isVacation;
+  vacationEl.classList.toggle('is-disabled', !isVacation);
+
+  if (!isVacation) {
+    vacationEl.value = '';
+  }
+}
+
+function bindVacationFieldControl_(){
+  const pairs = [
+    ['planDayAmLocation', 'planDayAmVacation'],
+    ['planDayPmLocation', 'planDayPmVacation'],
+  ];
+
+  pairs.forEach(([locationId, vacationId]) => {
+    const locationEl = $pid(locationId);
+    if (!locationEl) return;
+
+    locationEl.addEventListener('change', () => {
+      toggleVacationFieldByLocation_(locationId, vacationId);
+    });
+
+    toggleVacationFieldByLocation_(locationId, vacationId);
+  });
+}
+
+function splitSummaryCellToHalf_(cellText){
+  const text = nz(cellText);
+  if (!text) return { am: '', pm: '' };
+
+  if (text.includes('AM：') || text.includes('PM：')) {
+    const am = (text.match(/AM：([\s\S]*?)(?:\nPM：|$)/) || ['', ''])[1].trim();
+    const pm = (text.match(/PM：([\s\S]*?)$/) || ['', ''])[1].trim();
+    return { am, pm };
+  }
+
+  return { am: text, pm: text };
+}
+
+function stripHalfPrefix_(html){
+  return String(html || '')
+    .replace(/<span class="plan-half-label">AM：<\/span>/g, '')
+    .replace(/<span class="plan-half-label">PM：<\/span>/g, '');
+}
+
+function addSyncColorToCompactHtml_(halfText, dateKey){
+  const raw = nz(halfText);
+  const html = stripHalfPrefix_(renderSummaryCellHtml_(raw, dateKey));
+
+  if (/確定/.test(raw)) {
+    return `<div class="plan-sync-summary is-sync-fixed">${html}</div>`;
+  }
+  if (/仮/.test(raw)) {
+    return `<div class="plan-sync-summary is-sync-tentative">${html}</div>`;
+  }
+  return `<div class="plan-sync-summary is-sync-off">${html}</div>`;
+}
+
+function renderCompactHalfHtml_(halfText, dateKey){
+  if (!nz(halfText)) return '';
+  return addSyncColorToCompactHtml_(halfText, dateKey);
+}
+
+function renderSummaryCellCompactHtml_(cell, dateKey){
+  const text = nz(cell);
+  if (!text) return '';
+
+  const halves = splitSummaryCellToHalf_(text);
+
+  if (halves.am && halves.pm && halves.am === halves.pm) {
+    return `
+      <div class="plan-compact-center">
+        ${renderCompactHalfHtml_(halves.am, dateKey)}
+      </div>
+    `;
+  }
+
+  if (halves.am && halves.pm && halves.am !== halves.pm) {
+    return `
+      <div class="plan-compact-stack">
+        <div class="plan-compact-line">${renderCompactHalfHtml_(halves.am, dateKey)}</div>
+        <div class="plan-compact-arrow">↓</div>
+        <div class="plan-compact-line">${renderCompactHalfHtml_(halves.pm, dateKey)}</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="plan-compact-center">
+      ${renderCompactHalfHtml_(halves.am || halves.pm, dateKey)}
+    </div>
+  `;
+}
+
+function shiftYm_(ym, diff){
+  const [y, m] = String(ym || getTodayYm()).split('/').map(Number);
+  const d = new Date(y, (m - 1) + Number(diff || 0), 1);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/* =========================================================
+ * Group Filter
+ * ======================================================= */
+
+function getPlanGroupOptions_(){
+  return [
+    { key: 'SV', label: 'SVチーム' },
+    { key: 'CL', label: 'CLチーム' },
+    { key: 'PSE', label: 'PSEチーム' },
+    { key: 'PS(CL)', label: 'PS(CL)' },
+  ];
+}
+
+function updatePlanMemberFilterButtonText_(){
+  const btn = $pid('btnPlanMemberFilter');
+  if (!btn) return;
+
+  const keys = window.PlanAppState.selectedGroupKeys || [];
+  if (!keys.length) {
+    btn.textContent = '対象なし';
+    return;
+  }
+
+  if (keys.length === 2 && keys.includes('SV') && keys.includes('CL')) {
+    btn.textContent = 'CL＋SV';
+    return;
+  }
+
+  btn.textContent = keys.join(', ');
+}
+
+function togglePlanMemberFilterPop_(){
+  const pop = $pid('planMemberFilterPop');
+  if (!pop) return;
+
+  if (!pop.innerHTML.trim()) {
+    renderPlanMemberFilterPop_();
+  }
+  pop.hidden = !pop.hidden;
+}
+
+function renderPlanMemberFilterPop_(){
+  const pop = $pid('planMemberFilterPop');
+  if (!pop) return;
+
+  const selectedSet = new Set(window.PlanAppState.selectedGroupKeys || []);
+  const opts = getPlanGroupOptions_();
+
+  pop.innerHTML = `
+    <div class="plan-member-filter-section">
+      <div class="plan-member-filter-title">表示対象</div>
+      <div class="plan-filter-radio-list">
+        ${opts.map(o => `
+          <label class="plan-filter-item">
+            <input type="checkbox" class="js-plan-groupkey" value="${escHtml(o.key)}" ${selectedSet.has(o.key) ? 'checked' : ''}>
+            <span>${escHtml(o.label)}</span>
+          </label>
+        `).join('')}
+      </div>
+
+      <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
+        <button type="button" class="plan-btn plan-btn-light" id="btnPlanGroupDefault">SV+CL</button>
+        <button type="button" class="plan-btn plan-btn-light" id="btnPlanGroupAll">全選択</button>
+        <button type="button" class="plan-btn plan-btn-light" id="btnPlanGroupClear">クリア</button>
+      </div>
+    </div>
+  `;
+
+  pop.querySelectorAll('.js-plan-groupkey').forEach(el => {
+    el.addEventListener('change', () => {
+      window.PlanAppState.selectedGroupKeys =
+        Array.from(pop.querySelectorAll('.js-plan-groupkey:checked')).map(x => x.value);
+
+      updatePlanMemberFilterButtonText_();
+      renderPlanSummaryTable_(window.PlanAppState.summaryValues || []);
+    });
+  });
+
+  pop.querySelector('#btnPlanGroupDefault')?.addEventListener('click', () => {
+    window.PlanAppState.selectedGroupKeys = ['SV', 'CL'];
+    renderPlanMemberFilterPop_();
+    updatePlanMemberFilterButtonText_();
+    renderPlanSummaryTable_(window.PlanAppState.summaryValues || []);
+  });
+
+  pop.querySelector('#btnPlanGroupAll')?.addEventListener('click', () => {
+    window.PlanAppState.selectedGroupKeys = opts.map(x => x.key);
+    renderPlanMemberFilterPop_();
+    updatePlanMemberFilterButtonText_();
+    renderPlanSummaryTable_(window.PlanAppState.summaryValues || []);
+  });
+
+  pop.querySelector('#btnPlanGroupClear')?.addEventListener('click', () => {
+    window.PlanAppState.selectedGroupKeys = [];
+    renderPlanMemberFilterPop_();
+    updatePlanMemberFilterButtonText_();
+    renderPlanSummaryTable_(window.PlanAppState.summaryValues || []);
+  });
+}
+
+function getVisibleMemberHeaders_(memberHeaders){
+  const keys = window.PlanAppState.selectedGroupKeys || ['SV', 'CL'];
+  const defs = window.PlanAppState.master?.memberGroups || [];
+
+  const normalizeGroup = (v) => {
+    const s = nz(v).replace(/\s/g, '');
+    if (s === 'PS') return 'PS(CL)';
+    return s;
+  };
+
+  const selectedSet = new Set(keys.map(normalizeGroup));
+
+  return memberHeaders.filter(name => {
+    const def = defs.find(x => normalizeMemberName_(x.name) === normalizeMemberName_(name));
+    const group = normalizeGroup(def?.group);
+    return selectedSet.has(group);
+  });
+}
+
+function getMemberIndexMap_(header){
+  const map = {};
+  header.slice(2).forEach((name, i) => {
+    map[name] = i + 2;
+  });
+  return map;
+}
+
+function normalizeMemberName_(v){
+  return nz(v).replace(/\s/g, '');
+}
+
+function isMyMemberColumn_(name){
+  const me = normalizeMemberName_(window.PlanAppState.loginName || window.PlanAppState.memberName || '');
+  const target = normalizeMemberName_(name);
+  return !!me && me === target;
+}
+/* =========================================================
+ * unload guard
+ * ======================================================= */
+
+window.addEventListener('beforeunload', (e) => {
+  if (!window.PlanAppState.dirty) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+function isSyncTargetPlanHalf_(status){
+  const s = nz(status);
+  return s === '確定' || s === '仮';
+}
+
+function getSyncStateInfo_(halfRow){
+  const isTarget = isSyncTargetPlanHalf_(halfRow.status);
+  const hasEvent = !!nz(halfRow.eventId);
+  const syncStatus = nz(halfRow.syncStatus);
+
+  let targetClass = 'is-sync-off';
+  if (halfRow.status === '確定') targetClass = 'is-sync-fixed';
+  else if (halfRow.status === '仮') targetClass = 'is-sync-tentative';
+
+  let icon = '';
+  let iconTitle = '';
+
+  if (hasEvent || syncStatus === '作成' || syncStatus === '更新') {
+    icon = '✓';
+    iconTitle = halfRow.syncAt ? `同期済み: ${halfRow.syncAt}` : '同期済み';
+  } else if (syncStatus && syncStatus !== '対象外') {
+    icon = '!';
+    iconTitle = syncStatus;
+  }
+
+  return {
+    isTarget,
+    hasEvent,
+    syncStatus,
+    targetClass,
+    icon,
+    iconTitle,
+  };
+}
+
+function applyCurrentEditorToSelectedDate_(showMessage = true){
+  const dateKey = window.PlanAppState.selectedDateKey;
+  if (!dateKey) return false;
+
+  const row = getPersonalRowByDate_(dateKey);
+
+  row.week       = weekdayJa(dateKey);
+  row.amStatus   = $pid('planDayAmStatus')?.value || '';
+  row.amLocation = $pid('planDayAmLocation')?.value || '';
+  row.amVacation = $pid('planDayAmVacation')?.value || '';
+  row.amCustomer = $pid('planDayAmCustomer')?.value || '';
+
+  row.pmStatus   = $pid('planDayPmStatus')?.value || '';
+  row.pmLocation = $pid('planDayPmLocation')?.value || '';
+  row.pmVacation = $pid('planDayPmVacation')?.value || '';
+  row.pmCustomer = $pid('planDayPmCustomer')?.value || '';
+
+  window.PlanAppState.dirty = true;
+
+  renderPlanPersonalCalendar_(window.PlanAppState.personalRows);
+  highlightSelectedSlot_(dateKey, window.PlanAppState.selectedHalf);
+
+  if (showMessage) {
+    setPlanMeta_('個人予定：未保存の変更があります');
+    setPlanModalStatusLine_('未保存の変更があります');
+  }
+
+  return true;
+}
+
+</script>
