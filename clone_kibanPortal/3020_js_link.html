@@ -3,22 +3,30 @@
     items: [],
     q: '',
     cat: '',
-    collapsed: {}
+    collapsed: {},
   };
 
   const $link = (id) => document.getElementById(id);
 
-  function onLink(id, ev, fn){
+  function onLink(id, ev, fn) {
     const el = $link(id);
     if (!el) return null; // 無ければ何もしない
     el.addEventListener(ev, fn);
     return el;
   }
 
-  function escapeHtml(s){
-    return String(s ?? '').replace(/[&<>"']/g, c => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[c]));
+  function escapeHtml(s) {
+    return String(s ?? '').replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        }[c])
+    );
   }
 
   function renderLinks() {
@@ -26,7 +34,7 @@
     const q = st.q.trim().toLowerCase();
     const selectedCat = st.cat;
 
-    const filtered = st.items.filter(it => {
+    const filtered = st.items.filter((it) => {
       if (selectedCat && it.category !== selectedCat) return false;
       if (!q) return true;
       const hay = (String(it.name || '') + ' ' + String(it.desc || '')).toLowerCase();
@@ -34,26 +42,27 @@
     });
 
     const groups = new Map();
-    filtered.forEach(it => {
+    filtered.forEach((it) => {
       const cat = it.category || 'その他';
       if (!groups.has(cat)) groups.set(cat, []);
       groups.get(cat).push(it);
     });
 
-    const catNames = Array.from(groups.keys()).sort((a,b)=>{
+    const catNames = Array.from(groups.keys()).sort((a, b) => {
       const sa = st.categorySort?.[a] ?? 9999;
       const sb = st.categorySort?.[b] ?? 9999;
-      return sa - sb || String(a).localeCompare(String(b),'ja');
+      return sa - sb || String(a).localeCompare(String(b), 'ja');
     });
 
     const wrap = $link('grid');
     if (!wrap) return; // 他パネルではgridが無い
 
-    wrap.innerHTML = catNames.map(cat => {
-      const items = groups.get(cat) || [];
-      const collapsed = !!st.collapsed?.[cat];
+    wrap.innerHTML = catNames
+      .map((cat) => {
+        const items = groups.get(cat) || [];
+        const collapsed = !!st.collapsed?.[cat];
 
-      return `
+        return `
         <section class="portal-cat" data-cat="${escapeHtml(cat)}">
           <div class="portal-catHead">
             <button class="portal-toggle" data-toggle="1">
@@ -64,30 +73,42 @@
           </div>
 
           <div class="portal-tiles ${collapsed ? 'portal-hidden' : ''}">
-            ${items.map(it => `
-              <a class="portal-link" href="${escapeHtml(it.url)}" target="_blank" rel="noopener noreferrer">
-                ${it.iconUrl
-                  ? `<img class="portal-linkIcon" src="${escapeHtml(it.iconUrl)}" alt="">`
-                  : `<div class="portal-linkIcon" style="display:flex;align-items:center;justify-content:center;border:1px dashed rgba(0,0,0,.15);">No Icon</div>`
+            ${items
+              .map(
+                (it) => `
+              <a class="portal-link" href="${escapeHtml(
+                it.url
+              )}" target="_blank" rel="noopener noreferrer">
+                ${
+                  it.iconUrl
+                    ? `<img class="portal-linkIcon" src="${escapeHtml(it.iconUrl)}" alt="">`
+                    : `<div class="portal-linkIcon" style="display:flex;align-items:center;justify-content:center;border:1px dashed rgba(0,0,0,.15);">No Icon</div>`
                 }
                 <div class="portal-linkName">${escapeHtml(it.name)}</div>
-                ${it.desc ? `<div class="portal-linkHelp" data-help="1"
+                ${
+                  it.desc
+                    ? `<div class="portal-linkHelp" data-help="1"
                   data-name="${escapeHtml(it.name)}"
                   data-desc="${escapeHtml(it.desc)}"
-                  data-url="${escapeHtml(it.url)}">？</div>` : ''}
+                  data-url="${escapeHtml(it.url)}">？</div>`
+                    : ''
+                }
               </a>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         </section>
       `;
-    }).join('');
+      })
+      .join('');
 
     // empty表示
     const emptyEl = $link('empty');
     if (emptyEl) emptyEl.classList.toggle('portal-hidden', filtered.length !== 0);
 
     // 折り畳み
-    wrap.querySelectorAll('[data-toggle="1"]').forEach(btn => {
+    wrap.querySelectorAll('[data-toggle="1"]').forEach((btn) => {
       btn.addEventListener('click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -100,7 +121,7 @@
     });
 
     // ？
-    wrap.querySelectorAll('[data-help="1"]').forEach(el => {
+    wrap.querySelectorAll('[data-help="1"]').forEach((el) => {
       el.addEventListener('click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -109,19 +130,22 @@
     });
   }
 
-  function openLinkModal(title, body, url){
+  function openLinkModal(title, body, url) {
     const modal = $link('modal');
     if (!modal) return;
 
-    const t = $link('mTitle'); if (t) t.textContent = title || '説明';
-    const b = $link('mBody');  if (b) b.textContent  = body || '';
-    const o = $link('mOpen');  if (o) o.href = url || '#';
+    const t = $link('mTitle');
+    if (t) t.textContent = title || '説明';
+    const b = $link('mBody');
+    if (b) b.textContent = body || '';
+    const o = $link('mOpen');
+    if (o) o.href = url || '#';
 
     modal.classList.remove('portal-hidden');
     modal.setAttribute('aria-hidden', 'false');
   }
 
-  function closeLinkModal(){
+  function closeLinkModal() {
     const modal = $link('modal');
     if (!modal) return;
     modal.classList.add('portal-hidden');
@@ -141,7 +165,7 @@
     });
 
     if (!res || !res.ok) {
-      emptyEl.textContent = (res && res.error) ? res.error : '読み込みに失敗しました';
+      emptyEl.textContent = res && res.error ? res.error : '読み込みに失敗しました';
       emptyEl.classList.remove('portal-hidden');
       return;
     }
@@ -156,26 +180,36 @@
       const current = sel.value;
       sel.innerHTML =
         `<option value="">すべてのカテゴリ</option>` +
-        (res.categories || []).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        (res.categories || [])
+          .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
+          .join('');
       sel.value = current || '';
     }
 
     renderLinks();
   }
 
-  function initLinkPanel_(){
+  function initLinkPanel_() {
     // ★リンク集パネルが存在する時だけ初期化
     if (!document.getElementById('panel-link')) return;
 
-    onLink('q', 'input',   (e) => { window.LinkState.q   = e.target.value; renderLinks(); });
-    onLink('cat','change', (e) => { window.LinkState.cat = e.target.value; renderLinks(); });
+    onLink('q', 'input', (e) => {
+      window.LinkState.q = e.target.value;
+      renderLinks();
+    });
+    onLink('cat', 'change', (e) => {
+      window.LinkState.cat = e.target.value;
+      renderLinks();
+    });
     onLink('btnReload', 'click', loadLinks_);
 
     onLink('modalClose', 'click', closeLinkModal);
-    onLink('mClose',     'click', closeLinkModal);
-    onLink('mX',         'click', closeLinkModal);
+    onLink('mClose', 'click', closeLinkModal);
+    onLink('mX', 'click', closeLinkModal);
 
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLinkModal(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLinkModal();
+    });
 
     loadLinks_();
   }

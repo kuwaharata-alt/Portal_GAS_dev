@@ -1,0 +1,459 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; margin: 12px; }
+    .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .meta { color:#555; font-size:8px; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#f1f1f1; font-size:8px; }
+
+    .btn { padding:8px 10px; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+
+    select, input[type="text"] { padding:8px; }
+    .toggle { display:flex; align-items:center; gap:6px; }
+    .loading { margin-top:10px; }
+
+    .wrap{
+      border:1px solid #ddd; border-radius:8px; margin-top:10px;
+      overflow-x:auto; overflow-y:auto;
+      max-height: calc(100vh - 150px);
+      scrollbar-gutter: stable both-edges;
+    }
+
+    /* ===== テーブル共通：枠線を黒に ===== */
+    table {
+      border-collapse: collapse;
+      width: max-content;
+      min-width: 100%;
+      border: 1px solid #000;                         /* ★外枠：黒 */
+    }
+    th, td {
+      border: 1px solid #000;                         /* ★セル枠線：黒 */
+      padding: 6px 10px;
+    }
+
+    td { white-space: pre-wrap; word-break: break-word; } /* ★改行表示 */
+    tr:hover td { background:#fffef5; }
+
+    /* ★2段ヘッダー（上：フィルター / 下：ヘッダー） */
+    thead.filters th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #e6ecff;                            /* ★薄い青 */
+      color: #000;
+      white-space: nowrap;
+    }
+
+    thead.headers th {
+      position: sticky;
+      top: 38px;
+      z-index: 2;
+      background: #1f4fd8;                            /* ★青 */
+      color: #fff;                                    /* ★白字 */
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    thead.filters input {
+      width: 160px;
+      border: 1px solid #000;                         /* ★入力枠も黒 */
+    }
+
+    td a { text-decoration: underline; color: #0645ad; }
+
+    /* ===== ページャ ===== */
+    #pager { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+    #pager .pbtn {
+      padding:6px 10px; border:1px solid #000; background:#fff; border-radius:6px;
+      cursor:pointer; font-size:12px;
+    }
+    #pager .pbtn.active { background:#1f4fd8; color:#fff; border-color:#1f4fd8; }
+    #pager .pbtn:disabled { opacity:.5; cursor:not-allowed; }
+    #pager .dots { padding:0 6px; color:#666; }
+  </style>
+</head>
+
+<body>
+  <div class="bar">
+    <button class="btn" id="prev">前</button>
+    <button class="btn" id="next">次</button>
+
+    <label class="meta">表示件数</label>
+    <select id="limit">
+      <option value="50">50</option>
+      <option value="100" selected>100</option>
+      <option value="200">200</option>
+      <option value="-1">全件</option>
+    </select>
+
+    <label class="meta">B列ステータス</label>
+    <select id="statusSelect">
+      <option value="">（全て）</option>
+    </select>
+
+    <div class="toggle">
+      <input type="checkbox" id="hide89" checked>
+      <label for="hide89" class="meta">8x/9x を非表示（例：99.クローズは非表示）</label>
+    </div>
+
+    <button class="btn" id="reload">再読込</button>
+
+    <span class="meta" id="meta"></span>
+  </div>
+
+  <div class="loading" id="loading">読み込み中...</div>
+
+  <div class="wrap" id="wrap" style="display:none;">
+    <table>
+      <!-- ★順番：filters → headers -->
+      <thead class="filters" id="fhead"></thead>
+      <thead class="headers" id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- ★フッター：ページ番号（クリック遷移） -->
+  <div id="pager" style="display:none;"></div>
+
+<script>
+  let headers = [];
+  let rawRows = [];
+  let bgs = [];
+  let links = [];          // ★リンクURL 2次元配列
+
+  let offset = 0;
+  let limit = 100;         // -1 = 全件
+  let total = 0;
+
+  // hide89 ON の時は強制全件にするための復帰用
+  let lastPagedLimit = 100;
+
+  // 初回は「最後ページ（Noが大きい側）」へ飛ぶ
+  let bootedToLastPage = false;
+
+  // 列フィルター（列index -> 文字列）
+  const colFilters = new Map();
+
+  const elMeta = document.getElementById("meta");
+  const elLoading = document.getElementById("loading");
+  const elWrap = document.getElementById("wrap");
+  const elThead = document.getElementById("thead");
+  const elFhead = document.getElementById("fhead");
+  const elTbody = document.getElementById("tbody");
+  const elPrev = document.getElementById("prev");
+  const elNext = document.getElementById("next");
+  const elReload = document.getElementById("reload");
+  const elLimit = document.getElementById("limit");
+  const elHide89 = document.getElementById("hide89");
+  const elStatus = document.getElementById("statusSelect");
+  const elPager = document.getElementById("pager");
+
+  elReload.addEventListener("click", () => load(offset, limit));
+  elPrev.addEventListener("click", () => {
+    if (limit === -1) return;
+    load(Math.max(0, offset - limit), limit);
+  });
+  elNext.addEventListener("click", () => {
+    if (limit === -1) return;
+    load(Math.min(total, offset + limit), limit);
+  });
+
+  elLimit.addEventListener("change", () => {
+    limit = parseInt(elLimit.value, 10); // -1 = 全件
+    if (limit !== -1) lastPagedLimit = limit;
+    offset = 0;
+    bootedToLastPage = false; // 初回ロジックを再度効かせる
+    load(offset, limit);
+  });
+
+  // ★非表示フィルターONの時は全件表示に切り替える
+  elHide89.addEventListener("change", () => {
+    if (elHide89.checked) {
+      if (limit !== -1) lastPagedLimit = limit;
+      limit = -1;
+      elLimit.value = "-1";
+      offset = 0;
+      bootedToLastPage = true; // 全件なので最後ページへ飛ばす処理は不要
+      load(offset, limit);
+    } else {
+      limit = lastPagedLimit || 100;
+      elLimit.value = String(limit);
+      offset = 0;
+      bootedToLastPage = false;
+      load(offset, limit);
+    }
+  });
+
+  elStatus.addEventListener("change", render);
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // ★8x/9x 判定：8または9 + (1〜2桁) + '.' で開始
+  // 例）99.クローズ → true（非表示対象）
+  function is8x9xStatus(s) {
+    const t = String(s ?? "").trim();
+    return /^[89]\d{1,2}\./.test(t);
+  }
+
+  function passesDefaultStatusFilter(row) {
+    if (!elHide89.checked) return true;
+    const s = row[1]; // B列
+    return !is8x9xStatus(s);
+  }
+
+  function passesStatusDropdown(row) {
+    const selected = elStatus.value || "";
+    if (!selected) return true; // 全て
+    return String(row[1] ?? "").trim() === selected;
+  }
+
+  function passesColumnFilters(row) {
+    for (const [idx, q] of colFilters.entries()) {
+      if (idx === 1) continue; // B列は上のプルダウンでやる想定
+      const cell = String(row[idx] ?? "");
+      if (!cell.toLowerCase().includes(String(q).toLowerCase())) return false;
+    }
+    return true;
+  }
+
+  function parseNo(v) {
+    const s = String(v ?? "").trim();
+    const m = s.match(/^\d+/);
+    return m ? parseInt(m[0], 10) : -1;
+  }
+
+  function buildHeader() {
+    const tr = document.createElement("tr");
+    headers.forEach((h, idx) => {
+      const th = document.createElement("th");
+      th.textContent = h || `COL_${idx+1}`;
+      tr.appendChild(th);
+    });
+    elThead.innerHTML = "";
+    elThead.appendChild(tr);
+  }
+
+  // ★ヘッダーの上に列フィルター（入力欄）
+  function buildFilterRow() {
+    const tr = document.createElement("tr");
+    headers.forEach((_, idx) => {
+      const th = document.createElement("th");
+
+      // B列はプルダウンでやるので、列フィルター入力は無し（表示だけ）
+      if (idx === 1) {
+        th.textContent = "（B列は上のプルダウン）";
+      } else {
+        const inp = document.createElement("input");
+        inp.type = "text";
+        inp.placeholder = "filter";
+        inp.value = colFilters.get(idx) || "";
+        inp.addEventListener("input", () => {
+          const v = inp.value || "";
+          if (v) colFilters.set(idx, v);
+          else colFilters.delete(idx);
+          render();
+        });
+        th.appendChild(inp);
+      }
+
+      tr.appendChild(th);
+    });
+
+    elFhead.innerHTML = "";
+    elFhead.appendChild(tr);
+  }
+
+  function renderPager() {
+    if (limit === -1 || total === 0) {
+      elPager.style.display = "none";
+      return;
+    }
+
+    const pages = Math.ceil(total / limit);
+    const currentPage = Math.floor(offset / limit) + 1;
+
+    const windowSize = 3;
+    const start = Math.max(1, currentPage - windowSize);
+    const end = Math.min(pages, currentPage + windowSize);
+
+    const items = [];
+
+    function addBtn(p, label, active) {
+      const btn = document.createElement("button");
+      btn.className = "pbtn" + (active ? " active" : "");
+      btn.textContent = label ?? String(p);
+      btn.disabled = !!active;
+      btn.addEventListener("click", () => {
+        offset = (p - 1) * limit;
+        load(offset, limit);
+      });
+      items.push(btn);
+    }
+    function addDots() {
+      const span = document.createElement("span");
+      span.className = "dots";
+      span.textContent = "…";
+      items.push(span);
+    }
+
+    addBtn(1, "1", currentPage === 1);
+    if (start > 2) addDots();
+
+    for (let p = start; p <= end; p++) {
+      if (p === 1 || p === pages) continue;
+      addBtn(p, String(p), p === currentPage);
+    }
+
+    if (end < pages - 1) addDots();
+    if (pages >= 2) addBtn(pages, String(pages), currentPage === pages);
+
+    elPager.innerHTML = "";
+    items.forEach(x => elPager.appendChild(x));
+    elPager.style.display = "flex";
+  }
+
+  function render() {
+    // 行+背景色+リンクをセットで扱う（フィルターでズレない）
+    let pairs = rawRows.map((row, i) => ({
+      row,
+      bg: bgs[i] || [],
+      links: links[i] || []
+    }));
+
+    // 1) 初期要件：8x/9x 非表示（チェックON時）
+    pairs = pairs.filter(p => passesDefaultStatusFilter(p.row));
+
+    // 2) B列プルダウン（完全一致）
+    pairs = pairs.filter(p => passesStatusDropdown(p.row));
+
+    // 3) 列フィルター（部分一致）
+    pairs = pairs.filter(p => passesColumnFilters(p.row));
+
+    // ★No（A列=0）降順（Noが大きいものを上へ）
+    pairs.sort((a, b) => parseNo(b.row[0]) - parseNo(a.row[0]));
+
+    elTbody.innerHTML = pairs.map(p => {
+      const tds = headers.map((_, cidx) => {
+        const bg = p.bg[cidx] || "";
+        const style = bg ? ` style="background-color:${escapeHtml(bg)}"` : "";
+
+        // ★リンク（セルにURLがある場合はリンク化）
+        const url = p.links[cidx] || "";
+        const text = String(p.row[cidx] ?? "");
+
+        const cellHtml = url
+          ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text) || "開く"}</a>`
+          : `${escapeHtml(text)}`;
+
+        return `<td${style}>${cellHtml}</td>`;
+      }).join("");
+      return `<tr>${tds}</tr>`;
+    }).join("");
+
+    // 件数表示
+    const from = total === 0 ? 0 : (offset + 1);
+    const to = Math.min(total, offset + rawRows.length);
+    const rangeText = (limit === -1)
+      ? `全件表示（${total} 行）`
+      : `範囲 ${from} - ${to} / ${total}`;
+
+    elMeta.innerHTML = `
+      <span class="pill">ページ取得 ${rawRows.length} 行</span>
+      <span class="pill">表示 ${pairs.length} 行</span>
+      <span class="pill">${rangeText}</span>
+      <span class="pill">列フィルター ${colFilters.size} 件</span>
+    `;
+
+    // 全件時はページ操作を無効に
+    const pagingDisabled = (limit === -1);
+    elPrev.disabled = pagingDisabled || (offset <= 0);
+    elNext.disabled = pagingDisabled || (offset + limit >= total);
+
+    renderPager();
+  }
+
+  function loadStatusOptions() {
+    google.script.run
+      .withSuccessHandler(res => {
+        if (!res || !res.ok) return;
+        const opts = res.options || [];
+        elStatus.innerHTML =
+          `<option value="">（全て）</option>` +
+          opts.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+      })
+      .withFailureHandler(err => {
+        elLoading.innerHTML = "読み込み失敗（ステータス候補）: " + escapeHtml(err.message || err);
+      })
+      .api_getStatusOptions();
+  }
+
+  function load(newOffset, newLimit) {
+    elLoading.style.display = "block";
+    elWrap.style.display = "none";
+    elLoading.textContent = "読み込み中...";
+    elMeta.textContent = "";
+    elPager.style.display = "none";
+
+    const timer = setTimeout(() => {
+      elLoading.innerHTML = "読み込みが長いです（サーバ側で停止している可能性）。<br>GASの実行ログを確認してください。";
+    }, 15000);
+
+    google.script.run
+      .withSuccessHandler(res => {
+        clearTimeout(timer);
+
+        if (!res || !res.ok) {
+          elLoading.innerHTML = "読み込み失敗: " + escapeHtml(res?.error || "unknown");
+          return;
+        }
+
+        headers = res.headers || [];
+        rawRows = res.rows || [];
+        bgs = res.bgs || [];
+        links = res.links || [];
+        offset = res.offset || 0;
+        limit = (res.limit ?? newLimit);
+        total = res.total || 0;
+
+        // ★初回は「最後ページ」を表示（Noが大きい側）
+        if (!bootedToLastPage && limit !== -1 && total > 0) {
+          bootedToLastPage = true;
+          const lastPage = Math.ceil(total / limit);
+          const lastOffset = (lastPage - 1) * limit;
+          if (lastOffset !== offset) {
+            load(lastOffset, limit);
+            return;
+          }
+        }
+
+        buildFilterRow();
+        buildHeader();
+        render();
+
+        elLoading.style.display = "none";
+        elWrap.style.display = "block";
+      })
+      .withFailureHandler(err => {
+        clearTimeout(timer);
+        elLoading.innerHTML = "読み込み失敗: " + escapeHtml(err.message || err);
+      })
+      .api_getPagedTable(newOffset, newLimit);
+  }
+
+  // 初回
+  loadStatusOptions();
+  load(offset, limit);
+</script>
+</body>
+</html>

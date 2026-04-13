@@ -1,58 +1,68 @@
+const APP_TITLE = 'SOL推進基盤GrPortal';
+
 function doGet(e) {
   const p = e?.parameter || {};
   const action = (p.action || '').toLowerCase();
 
   if (action) {
-    const out = handleApiGet_(e) || { ok: false, error: `unknown action: ${action}` };
-    return ContentService
-      .createTextOutput(JSON.stringify(out))
-      .setMimeType(ContentService.MimeType.JSON);
+    const out = handleApiGet_(e) || unknownActionError_(action);
+    return json_(out);
   }
 
   return HtmlService.createTemplateFromFile('index')
     .evaluate()
-    .setTitle('SOL推進基盤Grポータル')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL) // 必要なら
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+    .setTitle(APP_TITLE)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function doPost(e) {
-  const res = handleApiPost_(e);
-  return ContentService
-    .createTextOutput(JSON.stringify(res))
-    .setMimeType(ContentService.MimeType.JSON);
+  return json_(handleApiPost_(e));
 }
 
 function handleApiGet_(e) {
   const p = e.parameter || {};
   const action = (p.action || '').toLowerCase();
 
-  if (action === 'case') {
-    return apiGetCaseByKey_(p.key || '');
+  switch (action) {
+    case 'case':
+      return apiGetCaseByKey_(p.key || '');
+    default:
+      return unknownActionError_(action);
   }
-
-  return { ok: false, error: `unknown action: ${action}` };
 }
 
 function json_(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+    ContentService.MimeType.JSON
+  );
 }
 
 function handleApiPost_(e) {
-  const body = JSON.parse(e.postData.contents || "{}");
+  const body = parsePostBody_(e);
 
-  if (body.action === "updateSv") {
-    updateSv_(body);
-    return { ok: true };
+  switch (body.action) {
+    case 'updateSv':
+      updateSv_(body);
+      return { ok: true };
+    default:
+      return unknownActionError_(body.action || '');
   }
-
-  return { ok: false, error: "unknown action" };
 }
 
+function parsePostBody_(e) {
+  const raw = e?.postData?.contents || '{}';
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return {};
+  }
+}
 
-/** 疎通確認 */
+function unknownActionError_(action) {
+  return { ok: false, error: `unknown action: ${action}` };
+}
+
+/** dead-simple health check */
 function api_ping() {
   return {
     ok: true,
@@ -63,7 +73,7 @@ function api_ping() {
     config: {
       SV: VIEW_CONFIG.SV,
       CL: VIEW_CONFIG.CL,
-    }
+    },
   };
 }
 

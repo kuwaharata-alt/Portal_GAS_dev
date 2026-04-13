@@ -1,372 +1,374 @@
 <script>
   /** ===== AppState: 1個だけに統一 ===== */
-window.AppState = window.AppState || {
-  type: 'SV',
-  headers: [],
-  rows: [],
-  headerIndex: {},
-  keyHeader: '見積番号',
-  customerHeader: '顧客名',
-  statusHeader: 'ステータス',
-  page: 1,
-  pageSize: 50,
-  total: 0,
-  loginUser: null,
-  auth: {
-    allowedKeys: [],
-    isAdmin: false,
-    isUser: false
-  },
-  plan: {
-    month: '',
-    columns: [],
-    groups: [],
+  window.AppState = window.AppState || {
+    type: 'SV',
+    headers: [],
     rows: [],
-    rowIndexMap: [],
-    changes: new Map(),
-    editing: null,
-  },
-  task: {
-    memberMode: 'all',
-    members: [],
-    loginUser: ''
-  },
-};
+    headerIndex: {},
+    keyHeader: '見積番号',
+    customerHeader: '顧客名',
+    statusHeader: 'ステータス',
+    page: 1,
+    pageSize: 50,
+    total: 0,
+    loginUser: null,
+    auth: {
+      allowedKeys: [],
+      isAdmin: false,
+      isUser: false,
+    },
+    plan: {
+      month: '',
+      columns: [],
+      groups: [],
+      rows: [],
+      rowIndexMap: [],
+      changes: new Map(),
+      editing: null,
+    },
+    task: {
+      memberMode: 'all',
+      members: [],
+      loginUser: '',
+    },
+  };
 
-const DEFAULT_PANEL = 'panel-link';
-const LS_KEY_PANEL  = 'activePanel';
-const LS_KEY_TYPE   = 'activeType';
+  const DEFAULT_PANEL = 'panel-link';
+  const LS_KEY_PANEL = 'activePanel';
+  const LS_KEY_TYPE = 'activeType';
 
-function setErr(msg){
-  const el = document.getElementById('meta');
-  if (!el) return;
+  function setErr(msg) {
+    const el = document.getElementById('meta');
+    if (!el) return;
 
-  el.textContent = msg || '';
-  el.classList.add('is-error');
-}
-
-function setMeta(msg){
-  const el = document.getElementById('meta');
-  if (!el) return;
-
-  el.textContent = msg || '';
-  el.classList.remove('is-error');
-}
-
-function getPanelFromHash(){
-  const h = (location.hash || '').replace(/^#/, '');
-  if (!h) return '';
-  try { return decodeURIComponent(h); } catch(e) { return h; }
-}
-
-function resolveInitialPanel(){
-  return getPanelFromHash()
-      || localStorage.getItem(LS_KEY_PANEL)
-      || DEFAULT_PANEL;
-}
-
-function setActivePanel(panelId, opts={pushHash:true}){
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.getElementById(panelId)?.classList.add('active');
-
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-
-  let targetBtn = null;
-  if (panelId === 'panel-list') {
-    const type = localStorage.getItem(LS_KEY_TYPE) || window.AppState.type || 'SV';
-    targetBtn =
-      document.querySelector(`.nav-btn[data-panel="panel-list"][data-type="${type}"]`)
-      || document.querySelector(`.nav-btn[data-panel="panel-list"][data-type="SV"]`);
-  } else {
-    targetBtn = document.querySelector(`.nav-btn[data-panel="${panelId}"]`);
-  }
-  targetBtn?.classList.add('active');
-
-  localStorage.setItem(LS_KEY_PANEL, panelId);
-  if (opts.pushHash) history.replaceState(null,'','#'+panelId);
-}
-
-/** ===== Sidebar: 表示/非表示 ===== */
-function toggleSidebar(){
-  document.getElementById('sidebar').classList.toggle('hidden');
-}
-
-/** ===== サイドバー onclick="navTo(this)" 用 ===== */
-async function navTo(btn){
-  if (!btn) return;
-
-  if (!isAllowedMenu_(btn)) {
-    setErr('このメニューを表示する権限がありません');
-    return;
+    el.textContent = msg || '';
+    el.classList.add('is-error');
   }
 
-  const url = btn.getAttribute('data-url');
-  if (url) { window.open(url, '_blank'); return; }
+  function setMeta(msg) {
+    const el = document.getElementById('meta');
+    if (!el) return;
 
-  const panelId  = btn.dataset.panel || DEFAULT_PANEL;
-  const nextType = btn.dataset.type  || '';
-  const action   = btn.dataset.action|| '';
-
-  if (nextType) localStorage.setItem(LS_KEY_TYPE, nextType);
-
-  setActivePanel(panelId, {pushHash:true});
-
-  if (typeof window.setTitleShort_ === 'function') window.setTitleShort_();
-
-  if (action && typeof window[action] === 'function') {
-    await window[action]();
-  } else {
-    setErr('');
-    setMeta('');
+    el.textContent = msg || '';
+    el.classList.remove('is-error');
   }
 
-  if (panelId === 'panel-list') {
-    const st = window.AppState;
-    st.type = nextType || localStorage.getItem(LS_KEY_TYPE) || 'SV';
-    await loadCases_();
-    return;
-  }
-
-  if (panelId === 'panel-rule') return await reload();
-  if (panelId === 'panel-task') return await loadTask();
-  if (panelId === 'panel-plan') return await loadPlan_();
-  if (panelId === 'panel-info') return await initInfoHub();
-  if (panelId === 'panel-operation') return await loadOperationDashboard();
-  if (panelId === 'panel-wbs') return await loadCaseWbs();
-}
-
-/** ===== 初回 & hash追従 ===== */
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    await fetchLoginUser_();
-  } catch (e) {
-    console.warn('login user取得失敗', e);
-  }
-
-  try {
-    await fetchMenuAuth_();
-  } catch (e) {
-    console.warn('menu auth取得失敗', e);
-  }
-
-  applyMenuAuth_();
-  renderLoginUser_();
-
-  let panelId = resolveInitialPanel();
-
-  // 権限のない画面がURLハッシュやlocalStorageに残っていた場合の逃がし
-  const firstBtn = getFirstAllowedButton_();
-  if (!firstBtn) {
-    setErr('表示可能なメニューがありません');
-    return;
-  }
-
-  const targetBtn = document.querySelector(`.nav-btn[data-panel="${panelId}"]`);
-  if (!targetBtn || !isAllowedMenu_(targetBtn)) {
-    panelId = firstBtn.dataset.panel || DEFAULT_PANEL;
-    if (firstBtn.dataset.type) {
-      localStorage.setItem(LS_KEY_TYPE, firstBtn.dataset.type);
+  function getPanelFromHash() {
+    const h = (location.hash || '').replace(/^#/, '');
+    if (!h) return '';
+    try {
+      return decodeURIComponent(h);
+    } catch (e) {
+      return h;
     }
   }
 
-  setActivePanel(panelId, { pushHash: true });
-
-  // ここは既存ロジックそのままでOK
-  if (panelId === 'panel-list') {
-    const st = window.AppState;
-    st.type = localStorage.getItem(LS_KEY_TYPE) || st.type || 'SV';
-    await loadCases_();
+  function resolveInitialPanel() {
+    return getPanelFromHash() || localStorage.getItem(LS_KEY_PANEL) || DEFAULT_PANEL;
   }
 
-  if (panelId === 'panel-rule') await reload();
-  if (panelId === 'panel-task') await loadTask();
-  if (panelId === 'panel-plan') await loadPlan_();
-  if (panelId === 'panel-info') await initInfoHub();
-  if (panelId === 'panel-operation') await loadOperationDashboard();
-  if (panelId === 'panel-wbs') await loadCaseWbs();
+  function setActivePanel(panelId, opts = { pushHash: true }) {
+    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+    document.getElementById(panelId)?.classList.add('active');
 
-  if (typeof window.setTitleShort_ === 'function') window.setTitleShort_();
-});
+    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
 
-window.addEventListener('hashchange', async () => {
-  const panelId = getPanelFromHash() || DEFAULT_PANEL;
-  setActivePanel(panelId, {pushHash:false});
+    let targetBtn = null;
+    if (panelId === 'panel-list') {
+      const type = localStorage.getItem(LS_KEY_TYPE) || window.AppState.type || 'SV';
+      targetBtn =
+        document.querySelector(`.nav-btn[data-panel="panel-list"][data-type="${type}"]`) ||
+        document.querySelector(`.nav-btn[data-panel="panel-list"][data-type="SV"]`);
+    } else {
+      targetBtn = document.querySelector(`.nav-btn[data-panel="${panelId}"]`);
+    }
+    targetBtn?.classList.add('active');
 
-  if (panelId === 'panel-list') {
-    const st = window.AppState;
-    st.type = localStorage.getItem(LS_KEY_TYPE) || st.type || 'SV';
-    await loadCases_();
-    return;
+    localStorage.setItem(LS_KEY_PANEL, panelId);
+    if (opts.pushHash) history.replaceState(null, '', '#' + panelId);
   }
 
-  if (panelId === 'panel-rule') {
-    await reload();
-    return;
+  /** ===== Sidebar: 表示/非表示 ===== */
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('hidden');
   }
 
-  if (panelId === 'panel-task') {
-    await loadTask();
-    return;
+  /** ===== サイドバー onclick="navTo(this)" 用 ===== */
+  async function navTo(btn) {
+    if (!btn) return;
+
+    if (!isAllowedMenu_(btn)) {
+      setErr('このメニューを表示する権限がありません');
+      return;
+    }
+
+    const url = btn.getAttribute('data-url');
+    if (url) {
+      window.open(url, '_blank');
+      return;
+    }
+
+    const panelId = btn.dataset.panel || DEFAULT_PANEL;
+    const nextType = btn.dataset.type || '';
+    const action = btn.dataset.action || '';
+
+    if (nextType) localStorage.setItem(LS_KEY_TYPE, nextType);
+
+    setActivePanel(panelId, { pushHash: true });
+
+    if (typeof window.setTitleShort_ === 'function') window.setTitleShort_();
+
+    if (action && typeof window[action] === 'function') {
+      await window[action]();
+    } else {
+      setErr('');
+      setMeta('');
+    }
+
+    if (panelId === 'panel-list') {
+      const st = window.AppState;
+      st.type = nextType || localStorage.getItem(LS_KEY_TYPE) || 'SV';
+      await loadCases_();
+      return;
+    }
+
+    if (panelId === 'panel-rule') return await reload();
+    if (panelId === 'panel-task') return await loadTask();
+    if (panelId === 'panel-plan') return await loadPlan_();
+    if (panelId === 'panel-info') return await initInfoHub();
+    if (panelId === 'panel-operation') return await loadOperationDashboard();
+    if (panelId === 'panel-wbs') return await loadCaseWbs();
   }
 
-  if (panelId === 'panel-plan') {
-    await loadPlan_();
-    return;
-  }
+  /** ===== 初回 & hash追従 ===== */
+  window.addEventListener('DOMContentLoaded', async () => {
+    try {
+      await fetchLoginUser_();
+    } catch (e) {
+      console.warn('login user取得失敗', e);
+    }
 
-  if (panelId === 'panel-info') {
-    await initInfoHub();
-    return;
-  }
-  if (panelId === 'panel-operation') {
-    await loadOperationDashboard();
-    return;
-  }
-  if (panelId === 'panel-wbs') {
-    await loadCaseWbs();
-    return;
-  }
-  if (typeof window.setTitleShort_ === 'function') window.setTitleShort_();
-});
+    try {
+      await fetchMenuAuth_();
+    } catch (e) {
+      console.warn('menu auth取得失敗', e);
+    }
 
-/** ===== ログインユーザー取得関数 ===== */
-function fetchLoginUser_(){
-  return new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler(res => {
-        if(!res?.ok){
-          reject(res?.error || 'login user api error');
-          return;
-        }
+    applyMenuAuth_();
+    renderLoginUser_();
 
-        window.AppState.loginUser = {
-          email: res.email,
-          name: res.name
-        };
+    let panelId = resolveInitialPanel();
 
-        resolve(res);
-      })
-      .withFailureHandler(err => reject(err))
-      .api_getLoginUser();
-  });
-}
+    // 権限のない画面がURLハッシュやlocalStorageに残っていた場合の逃がし
+    const firstBtn = getFirstAllowedButton_();
+    if (!firstBtn) {
+      setErr('表示可能なメニューがありません');
+      return;
+    }
 
-async function initApp_(){
-
-  try{
-    await fetchLoginUser_();
-    console.log('login user', AppState.loginUser);
-
-  }catch(err){
-    console.warn('login user取得失敗', err);
-  }
-
-  loadCases_();
-}
-
-function renderLoginUser_(){
-  const el = document.getElementById('loginUser');
-  if(!el) return;
-
-  const u = AppState.loginUser;
-  if(!u) return;
-
-  el.textContent = `ログイン：${u.name}`;
-}
-
-function setTitleShort_(){
-  const el = document.getElementById('pageTitle');
-  if (!el) return;
-
-  const active = document.querySelector('.panel.active');
-  const panelId = active?.id || '';
-
-  const type = localStorage.getItem(LS_KEY_TYPE) || window.AppState.type || 'SV';
-
-  const titleMap = {
-    'panel-list': type === 'CL' ? '案件管理表（倉庫）' : '案件管理表（本社/現地）',
-    'panel-rule': 'ルール管理',
-    'panel-task': 'タスク管理',
-    'panel-plan': '予定管理',
-    'panel-info': 'Info Hub',
-    'panel-operation': '稼働状況',
-    'panel-wbs': '案件全体WBS',
-    'panel-link': 'リンク集',
-    'panel-manual': 'マニュアル一覧'
-  };
-
-  el.textContent = titleMap[panelId] || 'SOL推進部基盤Grポータル';
-}
-
-function fetchMenuAuth_(){
-  return new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler(res => {
-        if (!res?.ok) {
-          reject(res?.error || 'menu auth api error');
-          return;
-        }
-
-        window.AppState.auth = {
-          allowedKeys: Array.isArray(res.allowedKeys) ? res.allowedKeys : [],
-          isAdmin: !!res.isAdmin,
-          isUser: !!res.isUser
-        };
-
-        resolve(res);
-      })
-      .withFailureHandler(err => reject(err))
-      .api_getMenuAuth();
-  });
-}
-
-function applyMenuAuth_(){
-  const allowed = new Set(window.AppState?.auth?.allowedKeys || []);
-
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    const key = btn.dataset.authKey || '';
-    const show = !key || allowed.has(key);
-
-    btn.style.display = show ? '' : 'none';
-    btn.dataset.visible = show ? '1' : '0';
-  });
-
-  // セクション見出しも、配下ボタンが全部非表示なら隠す
-  const menu = document.querySelector('.sb-menu');
-  if (!menu) return;
-
-  const children = Array.from(menu.children);
-  for (let i = 0; i < children.length; i++) {
-    const el = children[i];
-    if (!el.classList.contains('sb-section')) continue;
-
-    let hasVisibleBtn = false;
-    for (let j = i + 1; j < children.length; j++) {
-      const next = children[j];
-      if (next.classList.contains('sb-section')) break;
-      if (next.classList.contains('nav-btn') && next.dataset.visible === '1') {
-        hasVisibleBtn = true;
-        break;
+    const targetBtn = document.querySelector(`.nav-btn[data-panel="${panelId}"]`);
+    if (!targetBtn || !isAllowedMenu_(targetBtn)) {
+      panelId = firstBtn.dataset.panel || DEFAULT_PANEL;
+      if (firstBtn.dataset.type) {
+        localStorage.setItem(LS_KEY_TYPE, firstBtn.dataset.type);
       }
     }
 
-    el.style.display = hasVisibleBtn ? '' : 'none';
+    setActivePanel(panelId, { pushHash: true });
+
+    // ここは既存ロジックそのままでOK
+    if (panelId === 'panel-list') {
+      const st = window.AppState;
+      st.type = localStorage.getItem(LS_KEY_TYPE) || st.type || 'SV';
+      await loadCases_();
+    }
+
+    if (panelId === 'panel-rule') await reload();
+    if (panelId === 'panel-task') await loadTask();
+    if (panelId === 'panel-plan') await loadPlan_();
+    if (panelId === 'panel-info') await initInfoHub();
+    if (panelId === 'panel-operation') await loadOperationDashboard();
+    if (panelId === 'panel-wbs') await loadCaseWbs();
+
+    if (typeof window.setTitleShort_ === 'function') window.setTitleShort_();
+  });
+
+  window.addEventListener('hashchange', async () => {
+    const panelId = getPanelFromHash() || DEFAULT_PANEL;
+    setActivePanel(panelId, { pushHash: false });
+
+    if (panelId === 'panel-list') {
+      const st = window.AppState;
+      st.type = localStorage.getItem(LS_KEY_TYPE) || st.type || 'SV';
+      await loadCases_();
+      return;
+    }
+
+    if (panelId === 'panel-rule') {
+      await reload();
+      return;
+    }
+
+    if (panelId === 'panel-task') {
+      await loadTask();
+      return;
+    }
+
+    if (panelId === 'panel-plan') {
+      await loadPlan_();
+      return;
+    }
+
+    if (panelId === 'panel-info') {
+      await initInfoHub();
+      return;
+    }
+    if (panelId === 'panel-operation') {
+      await loadOperationDashboard();
+      return;
+    }
+    if (panelId === 'panel-wbs') {
+      await loadCaseWbs();
+      return;
+    }
+    if (typeof window.setTitleShort_ === 'function') window.setTitleShort_();
+  });
+
+  /** ===== ログインユーザー取得関数 ===== */
+  function fetchLoginUser_() {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (!res?.ok) {
+            reject(res?.error || 'login user api error');
+            return;
+          }
+
+          window.AppState.loginUser = {
+            email: res.email,
+            name: res.name,
+          };
+
+          resolve(res);
+        })
+        .withFailureHandler((err) => reject(err))
+        .api_getLoginUser();
+    });
   }
-}
 
-function isAllowedMenu_(btn){
-  if (!btn) return false;
-  const key = btn.dataset.authKey || '';
-  if (!key) return true;
+  async function initApp_() {
+    try {
+      await fetchLoginUser_();
+      console.log('login user', AppState.loginUser);
+    } catch (err) {
+      console.warn('login user取得失敗', err);
+    }
 
-  const allowed = new Set(window.AppState?.auth?.allowedKeys || []);
-  return allowed.has(key);
-}
+    loadCases_();
+  }
 
-function getFirstAllowedButton_(){
-  return Array.from(document.querySelectorAll('.nav-btn'))
-    .find(btn => isAllowedMenu_(btn));
-}
+  function renderLoginUser_() {
+    const el = document.getElementById('loginUser');
+    if (!el) return;
 
-window.setTitleShort_ = setTitleShort_;
+    const u = AppState.loginUser;
+    if (!u) return;
+
+    el.textContent = `ログイン：${u.name}`;
+  }
+
+  function setTitleShort_() {
+    const el = document.getElementById('pageTitle');
+    if (!el) return;
+
+    const active = document.querySelector('.panel.active');
+    const panelId = active?.id || '';
+
+    const type = localStorage.getItem(LS_KEY_TYPE) || window.AppState.type || 'SV';
+
+    const titleMap = {
+      'panel-list': type === 'CL' ? '案件管理表（倉庫）' : '案件管理表（本社/現地）',
+      'panel-rule': 'ルール管理',
+      'panel-task': 'タスク管理',
+      'panel-plan': '予定管理',
+      'panel-info': 'Info Hub',
+      'panel-operation': '稼働状況',
+      'panel-wbs': '案件全体WBS',
+      'panel-link': 'リンク集',
+      'panel-manual': 'マニュアル一覧',
+    };
+
+    el.textContent = titleMap[panelId] || 'SOL推進部基盤Grポータル';
+  }
+
+  function fetchMenuAuth_() {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (!res?.ok) {
+            reject(res?.error || 'menu auth api error');
+            return;
+          }
+
+          window.AppState.auth = {
+            allowedKeys: Array.isArray(res.allowedKeys) ? res.allowedKeys : [],
+            isAdmin: !!res.isAdmin,
+            isUser: !!res.isUser,
+          };
+
+          resolve(res);
+        })
+        .withFailureHandler((err) => reject(err))
+        .api_getMenuAuth();
+    });
+  }
+
+  function applyMenuAuth_() {
+    const allowed = new Set(window.AppState?.auth?.allowedKeys || []);
+
+    document.querySelectorAll('.nav-btn').forEach((btn) => {
+      const key = btn.dataset.authKey || '';
+      const show = !key || allowed.has(key);
+
+      btn.style.display = show ? '' : 'none';
+      btn.dataset.visible = show ? '1' : '0';
+    });
+
+    // セクション見出しも、配下ボタンが全部非表示なら隠す
+    const menu = document.querySelector('.sb-menu');
+    if (!menu) return;
+
+    const children = Array.from(menu.children);
+    for (let i = 0; i < children.length; i++) {
+      const el = children[i];
+      if (!el.classList.contains('sb-section')) continue;
+
+      let hasVisibleBtn = false;
+      for (let j = i + 1; j < children.length; j++) {
+        const next = children[j];
+        if (next.classList.contains('sb-section')) break;
+        if (next.classList.contains('nav-btn') && next.dataset.visible === '1') {
+          hasVisibleBtn = true;
+          break;
+        }
+      }
+
+      el.style.display = hasVisibleBtn ? '' : 'none';
+    }
+  }
+
+  function isAllowedMenu_(btn) {
+    if (!btn) return false;
+    const key = btn.dataset.authKey || '';
+    if (!key) return true;
+
+    const allowed = new Set(window.AppState?.auth?.allowedKeys || []);
+    return allowed.has(key);
+  }
+
+  function getFirstAllowedButton_() {
+    return Array.from(document.querySelectorAll('.nav-btn')).find((btn) => isAllowedMenu_(btn));
+  }
+
+  window.setTitleShort_ = setTitleShort_;
 </script>

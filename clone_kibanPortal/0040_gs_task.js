@@ -18,12 +18,10 @@ function getTaskSheet_() {
 
 /** ヘッダ配列取得 */
 function getTaskHeaders_(sheet) {
-  return sheet.getRange(
-    TASK_CONFIG.HEADER_ROW,
-    1,
-    1,
-    sheet.getLastColumn()
-  ).getValues()[0].map(v => String(v || '').trim());
+  return sheet
+    .getRange(TASK_CONFIG.HEADER_ROW, 1, 1, sheet.getLastColumn())
+    .getValues()[0]
+    .map((v) => String(v || '').trim());
 }
 
 /** ヘッダマップ取得（1-based） */
@@ -48,7 +46,7 @@ function getTaskSheetValues_(sheet) {
 function getTaskMemberHeaders_(headers) {
   return headers
     .slice(TASK_CONFIG.MEMBER_START_COL - 1)
-    .map(v => String(v || '').trim())
+    .map((v) => String(v || '').trim())
     .filter(Boolean);
 }
 
@@ -85,7 +83,7 @@ function calcTaskProgressFromRow_(rowVals, map, memberHeaders) {
   let doneCount = 0;
   let targetCount = 0;
 
-  memberHeaders.forEach(name => {
+  memberHeaders.forEach((name) => {
     const col = map[name];
     if (!col) return;
 
@@ -128,23 +126,25 @@ function api_getTask() {
       };
     }
 
-    const headers = values[0].map(v => String(v || '').trim());
+    const headers = values[0].map((v) => String(v || '').trim());
     const map = {};
-    headers.forEach((h, i) => { map[h] = i; }); // 0-based
+    headers.forEach((h, i) => {
+      map[h] = i;
+    }); // 0-based
 
     const memberHeaders = getTaskMemberHeaders_(headers);
     const loginUser = String(getActiveUserNameOrEmail_() || '');
 
     const data = values
       .slice(1)
-      .filter(r => r[map['タスク']])
-      .filter(r => String(r[map['ステータス']] || '') !== '完了')
-      .map(r => {
+      .filter((r) => r[map['タスク']])
+      .filter((r) => String(r[map['ステータス']] || '') !== '完了')
+      .map((r) => {
         const members = {};
         let doneCount = 0;
         let targetCount = 0;
 
-        memberHeaders.forEach(name => {
+        memberHeaders.forEach((name) => {
           const idx = map[name];
           const raw = idx != null ? r[idx] : '';
           let v = '';
@@ -178,13 +178,12 @@ function api_getTask() {
     const result = {
       ok: true,
       data: data,
-      members: memberHeaders.map(v => String(v || '')),
+      members: memberHeaders.map((v) => String(v || '')),
       loginUser: loginUser,
     };
 
     Logger.log('api_getTask result rows=' + result.data.length);
     return result;
-
   } catch (err) {
     Logger.log('api_getTask error: ' + err.message);
     return {
@@ -205,9 +204,11 @@ function api_updateTaskMemberCheck(no, memberName, checked) {
     const values = getTaskSheetValues_(sh);
     if (!values.length) return { ok: false, error: 'データがありません' };
 
-    const headers = values[0].map(v => String(v || '').trim());
+    const headers = values[0].map((v) => String(v || '').trim());
     const map = {};
-    headers.forEach((h, i) => { map[h] = i + 1; }); // 1-based
+    headers.forEach((h, i) => {
+      map[h] = i + 1;
+    }); // 1-based
 
     const memberHeaders = getTaskMemberHeaders_(headers);
 

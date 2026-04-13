@@ -137,7 +137,7 @@ function upsertByMapping_(sh, opt) {
   const values = opt.values || {};
   const always = opt.always || {};
   const transform = opt.transform;
-  const insertIfNotFound = (opt.insertIfNotFound !== false);
+  const insertIfNotFound = opt.insertIfNotFound !== false;
 
   if (!key) throw new Error('upsertByMapping_: key is empty');
 
@@ -152,7 +152,7 @@ function upsertByMapping_(sh, opt) {
   const missingHeaders = [];
   const updates = {};
 
-  Object.keys(mapping).forEach(inputKey => {
+  Object.keys(mapping).forEach((inputKey) => {
     const headerName = mapping[inputKey];
     const col = hm[headerName];
     if (!col) {
@@ -167,7 +167,7 @@ function upsertByMapping_(sh, opt) {
     updates[col] = v;
   });
 
-  Object.keys(always).forEach(headerName => {
+  Object.keys(always).forEach((headerName) => {
     const col = hm[headerName];
     if (!col) {
       missingHeaders.push(headerName);
@@ -176,7 +176,9 @@ function upsertByMapping_(sh, opt) {
     updates[col] = always[headerName];
   });
 
-  const cols = Object.keys(updates).map(Number).sort((a, b) => a - b);
+  const cols = Object.keys(updates)
+    .map(Number)
+    .sort((a, b) => a - b);
   if (cols.length) {
     const minCol = cols[0];
     const maxCol = cols[cols.length - 1];
@@ -186,7 +188,7 @@ function upsertByMapping_(sh, opt) {
       ? sh.getRange(targetRow, minCol, 1, width).getValues()[0]
       : new Array(width).fill('');
 
-    cols.forEach(c => {
+    cols.forEach((c) => {
       rowValues[c - minCol] = updates[c];
     });
 
@@ -206,14 +208,17 @@ function listUniqueFromColumn_(sh, col, opt) {
   const lastRow = sh.getLastRow();
   if (lastRow < startRow) return [];
 
-  const vals = sh.getRange(startRow, col, lastRow - startRow + 1, 1).getValues().flat();
+  const vals = sh
+    .getRange(startRow, col, lastRow - startRow + 1, 1)
+    .getValues()
+    .flat();
   const seen = new Set();
   const out = [];
 
-  vals.forEach(v => {
+  vals.forEach((v) => {
     const s = norm_(v);
     if (!s) return;
-    if (skipWords.some(w => s === w)) return;
+    if (skipWords.some((w) => s === w)) return;
     if (seen.has(s)) return;
     seen.add(s);
     out.push(s);
@@ -225,7 +230,7 @@ function listUniqueFromColumn_(sh, col, opt) {
 function groupByTwoCols_(rows) {
   const map = new Map();
 
-  (rows || []).forEach(r => {
+  (rows || []).forEach((r) => {
     const area = norm_(r[0]);
     const pref = norm_(r[1]);
     if (!area || !pref) return;
@@ -238,7 +243,7 @@ function groupByTwoCols_(rows) {
   for (const [area, prefs] of map.entries()) {
     const seen = new Set();
     const uniq = [];
-    prefs.forEach(p => {
+    prefs.forEach((p) => {
       if (seen.has(p)) return;
       seen.add(p);
       uniq.push(p);
@@ -251,7 +256,7 @@ function groupByTwoCols_(rows) {
 
 function joinMultiValue_(value, sep) {
   if (Array.isArray(value)) {
-    const arr = value.map(x => norm_(x)).filter(Boolean);
+    const arr = value.map((x) => norm_(x)).filter(Boolean);
     return arr.join(sep || '、');
   }
   return norm_(value);
@@ -262,7 +267,7 @@ function splitMultiValueSafe_(value) {
 
   return String(value ?? '')
     .split(/[\n,、\/／]/)
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
@@ -330,7 +335,7 @@ function openCloseFromCode_(code) {
 function uniqNums_(arr) {
   const seen = {};
   const out = [];
-  (arr || []).forEach(n => {
+  (arr || []).forEach((n) => {
     n = Number(n);
     if (!n || !isFinite(n)) return;
     if (seen[n]) return;
@@ -349,7 +354,7 @@ function writeSameRowByCols_(sh, rowNo, cols, valueResolver) {
   const width = maxCol - minCol + 1;
   const cur = sh.getRange(rowNo, minCol, 1, width).getValues()[0];
 
-  cols.forEach(col => {
+  cols.forEach((col) => {
     cur[col - minCol] = valueResolver(col);
   });
 
@@ -376,7 +381,6 @@ function formatInspectYm_(v) {
 }
 
 function api_getInspectMonths() {
-
   const ss = getSS_('案件');
   const sh = ss.getSheetByName('案件管理表');
 
@@ -388,15 +392,12 @@ function api_getInspectMonths() {
   const set = new Set();
 
   for (let i = 1; i < values.length; i++) {
-
     const v = values[i][col];
     if (!v) continue;
 
     const d = new Date(v);
 
-    const ym =
-      d.getFullYear() + '/' +
-      ('0' + (d.getMonth() + 1)).slice(-2);
+    const ym = d.getFullYear() + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
 
     set.add(ym);
   }

@@ -1,48 +1,59 @@
 <script>
-window.addEventListener('load', async () => {
-  ensureRuleTabs_();     // ★これを最初に
-  await loadMeta();
-  await goViewTab('基盤ルール');
-});
+  window.addEventListener('load', async () => {
+    ensureRuleTabs_(); // ★これを最初に
+    await loadMeta();
+    await goViewTab('基盤ルール');
+  });
 
-function ensureRuleTabs_(){
-  const panel = document.getElementById('panel-rule');
-  const wrap  = panel ? panel.querySelector('.wrap') : null;
-  const bar   = document.getElementById('barView');
-  if (!panel || !wrap || !bar) return;
+  function ensureRuleTabs_() {
+    const panel = document.getElementById('panel-rule');
+    const wrap = panel ? panel.querySelector('.wrap') : null;
+    const bar = document.getElementById('barView');
+    if (!panel || !wrap || !bar) return;
 
-  // 既にあれば何もしない
-  if (wrap.querySelector('.rule-tabs')) return;
+    // 既にあれば何もしない
+    if (wrap.querySelector('.rule-tabs')) return;
 
-  // tabs枠を作る
-  const tabs = document.createElement('div');
-  tabs.className = 'rule-tabs';
+    // tabs枠を作る
+    const tabs = document.createElement('div');
+    tabs.className = 'rule-tabs';
 
-  const spacer = document.createElement('span');
-  spacer.className = 'rule-flex-spacer';
+    const spacer = document.createElement('span');
+    spacer.className = 'rule-flex-spacer';
 
-  // いま barView の中にいるタブ達を集める
-  const ids = ['tab_base','tab_sv','tab_cl','tab_kanri','tab_syutyo','tab_history','tab_edit'];
-  const el = (id) => document.getElementById(id);
+    // いま barView の中にいるタブ達を集める
+    const ids = [
+      'tab_base',
+      'tab_sv',
+      'tab_cl',
+      'tab_kanri',
+      'tab_syutyo',
+      'tab_history',
+      'tab_edit',
+    ];
+    const el = (id) => document.getElementById(id);
 
-  // 追加順
-  ['tab_base','tab_sv','tab_cl','tab_kanri','tab_syutyo'].forEach(id => { if (el(id)) tabs.appendChild(el(id)); });
-  tabs.appendChild(spacer);
-  ['tab_history','tab_edit'].forEach(id => { if (el(id)) tabs.appendChild(el(id)); });
+    // 追加順
+    ['tab_base', 'tab_sv', 'tab_cl', 'tab_kanri', 'tab_syutyo'].forEach((id) => {
+      if (el(id)) tabs.appendChild(el(id));
+    });
+    tabs.appendChild(spacer);
+    ['tab_history', 'tab_edit'].forEach((id) => {
+      if (el(id)) tabs.appendChild(el(id));
+    });
 
-  // barView の “直前” に挿入（これで上に来る）
-  wrap.insertBefore(tabs, bar);
-}
-
+    // barView の “直前” に挿入（これで上に来る）
+    wrap.insertBefore(tabs, bar);
+  }
 
   // ===== Category 色定義 =====
   const CATEGORY_COLORS = {
-    '基盤ルール': { tab:'#2E7D32', bg:'#E8F5E9', border:'#43A047' },
-    'SV案件ルール': { tab:'#1565C0', bg:'#E3F2FD', border:'#1E88E5' },
-    'CL案件ルール': { tab:'#EF6C00', bg:'#FFF3E0', border:'#FB8C00' },
-    '案件管理表ルール': { tab:'#6A1B9A', bg:'#F3E5F5', border:'#8E24AA' },
+    基盤ルール: { tab: '#2E7D32', bg: '#E8F5E9', border: '#43A047' },
+    SV案件ルール: { tab: '#1565C0', bg: '#E3F2FD', border: '#1E88E5' },
+    CL案件ルール: { tab: '#EF6C00', bg: '#FFF3E0', border: '#FB8C00' },
+    案件管理表ルール: { tab: '#6A1B9A', bg: '#F3E5F5', border: '#8E24AA' },
   };
-  const DEFAULT_COLOR = { tab:'#616161', bg:'#F5F5F5', border:'#9E9E9E' };
+  const DEFAULT_COLOR = { tab: '#616161', bg: '#F5F5F5', border: '#9E9E9E' };
 
   const $r = (id) => document.getElementById(id);
   let cache = [];
@@ -56,7 +67,9 @@ function ensureRuleTabs_(){
     await goViewTab('基盤ルール');
   });
 
-  function setStatus(msg) { $r('status').textContent = msg || ''; }
+  function setStatus(msg) {
+    $r('status').textContent = msg || '';
+  }
 
   function run_(fnName, ...args) {
     return new Promise((resolve, reject) => {
@@ -69,13 +82,13 @@ function ensureRuleTabs_(){
 
   function setActiveTabUI_() {
     const tabs = [
-      { id:'tab_base',  cat:'基盤ルール' },
-      { id:'tab_sv',    cat:'SV案件ルール' },
-      { id:'tab_cl',    cat:'CL案件ルール' },
-      { id:'tab_kanri', cat:'案件管理表ルール' },
+      { id: 'tab_base', cat: '基盤ルール' },
+      { id: 'tab_sv', cat: 'SV案件ルール' },
+      { id: 'tab_cl', cat: 'CL案件ルール' },
+      { id: 'tab_kanri', cat: '案件管理表ルール' },
     ];
 
-    tabs.forEach(t => {
+    tabs.forEach((t) => {
       const el = $r(t.id);
       if (!el) return;
       const c = CATEGORY_COLORS[t.cat] || DEFAULT_COLOR;
@@ -125,16 +138,18 @@ function ensureRuleTabs_(){
   }
 
   function applyModeUI_() {
-    $r('barView').style.display = (mode === 'view') ? '' : 'none';
-    $r('viewWrap').style.display = (mode === 'view') ? '' : 'none';
+    $r('barView').style.display = mode === 'view' ? '' : 'none';
+    $r('viewWrap').style.display = mode === 'view' ? '' : 'none';
 
-    $r('barEdit').style.display = (mode === 'edit') ? '' : 'none';
-    $r('editWrap').style.display = (mode === 'edit') ? '' : 'none';
+    $r('barEdit').style.display = mode === 'edit' ? '' : 'none';
+    $r('editWrap').style.display = mode === 'edit' ? '' : 'none';
 
-    $r('barHistory').style.display = (mode === 'history') ? '' : 'none';
-    $r('historyWrap').style.display = (mode === 'history') ? '' : 'none';
+    $r('barHistory').style.display = mode === 'history' ? '' : 'none';
+    $r('historyWrap').style.display = mode === 'history' ? '' : 'none';
 
-    try { $r('dlg').close(); } catch(e) {}
+    try {
+      $r('dlg').close();
+    } catch (e) {}
   }
 
   async function loadMeta() {
@@ -143,16 +158,18 @@ function ensureRuleTabs_(){
       if (!r.ok) return;
 
       const secSel = $r('section');
-      r.data.sections.forEach(s => {
+      r.data.sections.forEach((s) => {
         const opt = document.createElement('option');
-        opt.value = s; opt.textContent = `Section: ${s}`;
+        opt.value = s;
+        opt.textContent = `Section: ${s}`;
         secSel.appendChild(opt);
       });
 
       const secSel2 = $r('sectionEdit');
-      r.data.sections.forEach(s => {
+      r.data.sections.forEach((s) => {
         const opt = document.createElement('option');
-        opt.value = s; opt.textContent = `Section: ${s}`;
+        opt.value = s;
+        opt.textContent = `Section: ${s}`;
         secSel2.appendChild(opt);
       });
     } catch (e) {}
@@ -206,7 +223,10 @@ function ensureRuleTabs_(){
     try {
       const f = getFilters_();
       const r = await run_('ui_list', f);
-      if (!r.ok) { setStatus('取得失敗'); return; }
+      if (!r.ok) {
+        setStatus('取得失敗');
+        return;
+      }
 
       cache = r.data || [];
       if (mode === 'view') renderView_();
@@ -223,7 +243,10 @@ function ensureRuleTabs_(){
     try {
       const limit = Number($r('historyLimit').value || 200);
       const r = await run_('ui_history_list', { limit });
-      if (!r.ok) { setStatus('履歴取得失敗'); return; }
+      if (!r.ok) {
+        setStatus('履歴取得失敗');
+        return;
+      }
       renderHistory_(r.data || []);
       setStatus(`履歴 OK：${(r.data || []).length}件`);
     } catch (e) {
@@ -235,7 +258,7 @@ function ensureRuleTabs_(){
     const tb = $r('historyBody');
     tb.innerHTML = '';
 
-    rows.forEach(h => {
+    rows.forEach((h) => {
       const tr = document.createElement('tr');
       tr.innerHTML =
         `<td>${Number(h.No || 0)}</td>` +
@@ -276,13 +299,14 @@ function ensureRuleTabs_(){
       h.style.alignItems = 'baseline';
       h.style.gap = '10px';
       h.innerHTML =
-        `<div style="font-size:16px; font-weight:800; color:${color.border};">${escapeHtml(sec)}</div>` +
-        `<div class="muted">${items.length}件</div>`;
+        `<div style="font-size:16px; font-weight:800; color:${color.border};">${escapeHtml(
+          sec
+        )}</div>` + `<div class="muted">${items.length}件</div>`;
       box.appendChild(h);
 
       items
         .slice()
-        .sort((a,b) => Number(a.Sort||0) - Number(b.Sort||0))
+        .sort((a, b) => Number(a.Sort || 0) - Number(b.Sort || 0))
         .forEach((o, idx) => {
           const displayNo = idx + 1;
 
@@ -293,14 +317,16 @@ function ensureRuleTabs_(){
 
           row.innerHTML =
             `<div style="display:grid; grid-template-columns:36px 1fr; gap:12px; align-items:start;">` +
-              `<div style="text-align:center; font-weight:700; color:${color.border}; font-size:14px; padding-top:4px;">${displayNo}</div>` +
-              `<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">` +
-                `<div style="background:#fff; border-radius:8px; padding:10px 12px; white-space:pre-wrap; font-weight:600;">${escapeHtml(o.Content || '')}</div>` +
-                `<div style="background:#fff; border-radius:8px; padding:10px 12px;">` +
-                  `<div class="muted" style="font-weight:700; margin-bottom:4px;">備考</div>` +
-                  `<div style="white-space:pre-wrap; color:#555;">${escapeHtml(o.Note || '')}</div>` +
-                `</div>` +
-              `</div>` +
+            `<div style="text-align:center; font-weight:700; color:${color.border}; font-size:14px; padding-top:4px;">${displayNo}</div>` +
+            `<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">` +
+            `<div style="background:#fff; border-radius:8px; padding:10px 12px; white-space:pre-wrap; font-weight:600;">${escapeHtml(
+              o.Content || ''
+            )}</div>` +
+            `<div style="background:#fff; border-radius:8px; padding:10px 12px;">` +
+            `<div class="muted" style="font-weight:700; margin-bottom:4px;">備考</div>` +
+            `<div style="white-space:pre-wrap; color:#555;">${escapeHtml(o.Note || '')}</div>` +
+            `</div>` +
+            `</div>` +
             `</div>`;
 
           box.appendChild(row);
@@ -315,14 +341,16 @@ function ensureRuleTabs_(){
     const tb = $r('tbody');
     tb.innerHTML = '';
 
-    cache.forEach(o => {
+    cache.forEach((o) => {
       const tr = document.createElement('tr');
       if (!o.Enabled) tr.classList.add('row-disabled');
 
       tr.innerHTML =
         `<td>` +
-          `<button onclick="openEdit('${o.ID}')">編集</button> ` +
-          `<button onclick="toggleRow('${o.ID}', ${o.Enabled ? 'false' : 'true'})">${o.Enabled ? '無効' : '有効'}</button>` +
+        `<button onclick="openEdit('${o.ID}')">編集</button> ` +
+        `<button onclick="toggleRow('${o.ID}', ${o.Enabled ? 'false' : 'true'})">${
+          o.Enabled ? '無効' : '有効'
+        }</button>` +
         `</td>` +
         `<td><span class="pill">${escapeHtml(o.ID)}</span></td>` +
         `<td>${escapeHtml(o.Category)}</td>` +
@@ -353,7 +381,7 @@ function ensureRuleTabs_(){
   }
 
   function openEdit(id) {
-    const o = cache.find(x => x.ID === id);
+    const o = cache.find((x) => x.ID === id);
     if (!o) return;
 
     $r('dlgTitle').textContent = '編集';
@@ -362,13 +390,15 @@ function ensureRuleTabs_(){
     $r('fSection').value = o.Section || '';
     $r('fContent').value = o.Content || '';
     $r('fNote').value = o.Note || '';
-    $r('fSort').value = (o.Sort ?? '');
+    $r('fSort').value = o.Sort ?? '';
     $r('fEnabled').value = o.Enabled ? 'true' : 'false';
     $r('dlgMsg').textContent = '';
     $r('dlg').showModal();
   }
 
-  function closeDlg() { $r('dlg').close(); }
+  function closeDlg() {
+    $r('dlg').close();
+  }
 
   async function save() {
     $r('dlgMsg').textContent = '保存中...';
@@ -401,19 +431,20 @@ function ensureRuleTabs_(){
       // 画面反映
       $r('dlg').close();
       await reload();
-
     } catch (e) {
       $r('dlgMsg').textContent = '保存失敗：' + (e.message || e);
     }
   }
-
 
   async function toggleRow(id, enabled) {
     if (!confirm(`${id} を ${enabled ? '有効' : '無効'} にします。よろしいですか？`)) return;
     setStatus('更新中...');
     try {
       const r = await run_('ui_toggle', id, enabled);
-      if (!r.ok) { setStatus('更新失敗'); return; }
+      if (!r.ok) {
+        setStatus('更新失敗');
+        return;
+      }
       await reload();
     } catch (e) {
       setStatus('更新失敗: ' + (e.message || e));
@@ -422,10 +453,10 @@ function ensureRuleTabs_(){
 
   function escapeHtml(s) {
     return String(s ?? '')
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;')
-      .replaceAll("'","&#39;");
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
 </script>

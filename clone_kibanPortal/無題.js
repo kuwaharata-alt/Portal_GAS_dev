@@ -43,7 +43,7 @@ function Apply_StatusValidation_SVCL() {
   if (mLastRow < 2) throw new Error('ステータスマスタにデータがありません');
 
   const mValues = shMaster.getRange(1, 1, mLastRow, mLastCol).getValues();
-  const mHeaders = mValues[0].map(v => String(v ?? '').trim());
+  const mHeaders = mValues[0].map((v) => String(v ?? '').trim());
   const mMap = headerMapFromRow_(mHeaders);
 
   const colType = mustCol_(mMap, '対象');
@@ -55,7 +55,9 @@ function Apply_StatusValidation_SVCL() {
 
   for (let r = 1; r < mValues.length; r++) {
     const row = mValues[r];
-    const type = String(row[colType - 1] ?? '').trim().toUpperCase();
+    const type = String(row[colType - 1] ?? '')
+      .trim()
+      .toUpperCase();
     const disp = String(row[colDisp - 1] ?? '').trim();
     const sort = Number(row[colSort - 1]) || 9999;
     if (!disp) continue;
@@ -65,11 +67,11 @@ function Apply_StatusValidation_SVCL() {
   }
 
   // sort順にして表示名だけに
-  svList.sort((a,b) => a.sort - b.sort || a.disp.localeCompare(b.disp));
-  clList.sort((a,b) => a.sort - b.sort || a.disp.localeCompare(b.disp));
+  svList.sort((a, b) => a.sort - b.sort || a.disp.localeCompare(b.disp));
+  clList.sort((a, b) => a.sort - b.sort || a.disp.localeCompare(b.disp));
 
-  const svVals = svList.map(x => [x.disp]);
-  const clVals = clList.map(x => [x.disp]);
+  const svVals = svList.map((x) => [x.disp]);
+  const clVals = clList.map((x) => [x.disp]);
 
   // ===== 2) _DV_Status を更新（候補一覧）=====
   // A列:SV / B列:CL
@@ -97,7 +99,10 @@ function applyValidationToSheet_(sh, headerName, rangeA1, applyToMaxRows) {
   const lastCol = sh.getLastColumn();
   if (lastCol < 1) throw new Error(`シートが空です: ${sh.getName()}`);
 
-  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(v => String(v ?? '').trim());
+  const headers = sh
+    .getRange(1, 1, 1, lastCol)
+    .getValues()[0]
+    .map((v) => String(v ?? '').trim());
   const map = headerMapFromRow_(headers);
   const col = map[headerName];
   if (!col) throw new Error(`シート「${sh.getName()}」にヘッダー「${headerName}」が見つかりません`);

@@ -1,5 +1,5 @@
 /** ======================================================================
- * 案件一覧表示用 
+ * 案件一覧表示用
  * ====================================================================== */
 const WEBVIEW = {
   SS_KEY: 'Project',
@@ -47,13 +47,9 @@ function api_list(params) {
     const cfg = VIEW_CONFIG[type] || VIEW_CONFIG.SV;
 
     const q = normalizeSearchText_(p.q || '');
-    const memberFilters = Array.isArray(p.members)
-      ? p.members.map(nz_).filter(Boolean)
-      : [];
+    const memberFilters = Array.isArray(p.members) ? p.members.map(nz_).filter(Boolean) : [];
     const categoryFilter = nz_(p.category);
-    const statusFilters = Array.isArray(p.statuses)
-      ? p.statuses.map(nz_).filter(Boolean)
-      : [];
+    const statusFilters = Array.isArray(p.statuses) ? p.statuses.map(nz_).filter(Boolean) : [];
 
     const ss = getSS_(WEBVIEW.SS_KEY);
     const shProject = ss.getSheetByName(WEBVIEW.SHEET_PROJECT);
@@ -63,13 +59,13 @@ function api_list(params) {
     if (!shDetail) throw new Error(`シートが見つかりません: ${cfg.detailSheetName}`);
 
     const projectObj = readSheetObjects_(shProject, WEBVIEW.HEADER_ROW_PROJECT, WEBVIEW.KEY_HEADER);
-    const detailObj  = readSheetObjects_(shDetail, cfg.detailHeaderRow, WEBVIEW.KEY_HEADER);
+    const detailObj = readSheetObjects_(shDetail, cfg.detailHeaderRow, WEBVIEW.KEY_HEADER);
 
     const headers = ['ステータス', '案件概要', '案件情報', '担当SE', '作業期間', '備考'];
     const rows = [];
     const projectMap = projectObj.rowMap;
 
-    (detailObj.rows || []).forEach(dt => {
+    (detailObj.rows || []).forEach((dt) => {
       const key = nz_(dt[WEBVIEW.KEY_HEADER]);
       if (!key) return;
 
@@ -77,7 +73,7 @@ function api_list(params) {
       const rowObj = buildListRow_(type, key, pj, dt);
 
       if (memberFilters.length > 0) {
-        const hit = memberFilters.some(name => rowObj.memberNames.includes(name));
+        const hit = memberFilters.some((name) => rowObj.memberNames.includes(name));
         if (!hit) return;
       }
 
@@ -148,14 +144,14 @@ function api_getListFilterMaster(params) {
     if (!shDetail) throw new Error(`シートが見つかりません: ${cfg.detailSheetName}`);
 
     const projectObj = readSheetObjects_(shProject, WEBVIEW.HEADER_ROW_PROJECT, WEBVIEW.KEY_HEADER);
-    const detailObj  = readSheetObjects_(shDetail, cfg.detailHeaderRow, WEBVIEW.KEY_HEADER);
+    const detailObj = readSheetObjects_(shDetail, cfg.detailHeaderRow, WEBVIEW.KEY_HEADER);
 
     const projectMap = projectObj.rowMap;
     const memberSet = new Set();
     const categorySet = new Set();
     const statusSet = new Set();
 
-    (detailObj.rows || []).forEach(dt => {
+    (detailObj.rows || []).forEach((dt) => {
       const key = nz_(dt[WEBVIEW.KEY_HEADER]);
       if (!key) return;
 
@@ -165,7 +161,7 @@ function api_getListFilterMaster(params) {
       if (rowObj.category) categorySet.add(rowObj.category);
       if (rowObj.statusFilterValue) statusSet.add(rowObj.statusFilterValue);
 
-      (rowObj.memberNames || []).forEach(name => {
+      (rowObj.memberNames || []).forEach((name) => {
         if (name) memberSet.add(name);
       });
     });
@@ -206,14 +202,7 @@ function buildListRow_(type, key, pj, dt) {
     category,
     memberNames,
     statusFilterValue,
-    cells: [
-      statusHtml,
-      summaryHtml,
-      caseInfoHtml,
-      memberHtml,
-      periodHtml,
-      remarksHtml,
-    ],
+    cells: [statusHtml, summaryHtml, caseInfoHtml, memberHtml, periodHtml, remarksHtml],
   };
 }
 
@@ -240,13 +229,15 @@ function buildStatusHtml_(dt, type) {
 }
 
 function parseStatusParts_(raw) {
-  const s = String(raw || '').replace(/\r/g, '').trim();
+  const s = String(raw || '')
+    .replace(/\r/g, '')
+    .trim();
   const m = s.match(/^【([^】]+)】\s*\n?\s*(.*)$/);
 
   return {
     raw: s,
     kind: m ? m[1].trim() : '',
-    status: m ? m[2].trim() : s
+    status: m ? m[2].trim() : s,
   };
 }
 
@@ -258,7 +249,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '案件管理',
       status: rawStatus || '未設定',
-      displayText: rawStatus || '未設定'
+      displayText: rawStatus || '未設定',
     };
   }
 
@@ -267,7 +258,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: 'ドキュメント',
       status: st,
-      displayText: `ドキュメント\n${st}`
+      displayText: `ドキュメント\n${st}`,
     };
   }
 
@@ -276,7 +267,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '社内作業中',
       status: st,
-      displayText: `社内作業中\n${st}`
+      displayText: `社内作業中\n${st}`,
     };
   }
 
@@ -285,7 +276,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '現地作業中',
       status: st,
-      displayText: `現地作業中\n${st}`
+      displayText: `現地作業中\n${st}`,
     };
   }
 
@@ -294,14 +285,14 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '倉庫作業中',
       status: st,
-      displayText: `倉庫作業中\n${st}`
+      displayText: `倉庫作業中\n${st}`,
     };
   }
 
   return {
     kind: kind || '',
     status: rawStatus || '未設定',
-    displayText: rawStatus || '未設定'
+    displayText: rawStatus || '未設定',
   };
 }
 
@@ -309,8 +300,8 @@ function buildStatusMiniIcons_(dt) {
   const items = [];
 
   const internal = shortStatusLabel_(dt['社内作業ステータス']);
-  const onsite   = shortStatusLabel_(dt['現地作業ステータス']);
-  const wh       = shortStatusLabel_(dt['倉庫作業ステータス']);
+  const onsite = shortStatusLabel_(dt['現地作業ステータス']);
+  const wh = shortStatusLabel_(dt['倉庫作業ステータス']);
 
   if (internal) {
     items.push(miniStatusHtml_('内：', internal, 'mini-internal'));
@@ -345,36 +336,36 @@ function getStatusChipClass_(kind, status) {
   const s = nz_(status);
 
   if (k === '案件管理') {
-    if (s.includes('クローズ'))   return 'st-close';
+    if (s.includes('クローズ')) return 'st-close';
     if (s.includes('キャンセル')) return 'st-cancel';
-    if (s.includes('保守'))       return 'st-hold';
-    if (s.includes('完了'))       return 'st-case-done';
-    if (s.includes('済'))         return 'st-case-done';
-    if (s.includes('調整中'))     return 'st-case-progress';
+    if (s.includes('保守')) return 'st-hold';
+    if (s.includes('完了')) return 'st-case-done';
+    if (s.includes('済')) return 'st-case-done';
+    if (s.includes('調整中')) return 'st-case-progress';
     return 'st-case';
   }
 
   if (k === 'ドキュメント') {
-    if (s.includes('対応中'))   return 'st-progress';
+    if (s.includes('対応中')) return 'st-progress';
     return 'st-doc';
   }
 
   if (k === '社内作業中') {
-    if (s.includes('完了'))         return 'st-internal-done';
-    if (s.includes('機器出荷待ち'))  return 'st-wait';
+    if (s.includes('完了')) return 'st-internal-done';
+    if (s.includes('機器出荷待ち')) return 'st-wait';
     if (s.includes('対応中') || s.includes('セットアップ中')) return 'st-progress';
     if (s.includes('対応無') || s.includes('セットアップ中')) return 'st-nothing';
     return 'st-internal';
   }
 
   if (k === '現地作業中') {
-    if (s.includes('完了'))   return 'st-onsite-done';
+    if (s.includes('完了')) return 'st-onsite-done';
     if (s.includes('対応中') || s.includes('作業中')) return 'st-onsite-progress';
     return 'st-onsite';
   }
 
   if (k === '倉庫作業中') {
-    if (s.includes('完了'))   return 'st-warehouse-done';
+    if (s.includes('完了')) return 'st-warehouse-done';
     if (s.includes('対応中')) return 'st-warehouse-progress';
     return 'st-warehouse';
   }
@@ -397,7 +388,9 @@ function buildSummaryHtml_(key, customer, pj, dt, type) {
 
   const headText = `【${escapeHtml_(key)}】${escapeHtml_(customer)}`;
   const headHtml = estimateUrl
-    ? `<a class="case-summary-link" href="${escapeHtml_(estimateUrl)}" target="_blank" rel="noopener noreferrer">${headText}</a>`
+    ? `<a class="case-summary-link" href="${escapeHtml_(
+        estimateUrl
+      )}" target="_blank" rel="noopener noreferrer">${headText}</a>`
     : headText;
 
   return `
@@ -410,13 +403,7 @@ function buildSummaryHtml_(key, customer, pj, dt, type) {
 
 function getEstimateUrl_(pj, dt) {
   // 1) 案件情報シートの「見積」列を最優先
-  const pjUrl =
-    firstNonEmpty_(
-      pj['__link_見積'],
-      pj['見積'],
-      dt['__link_見積'],
-      dt['見積']
-    );
+  const pjUrl = firstNonEmpty_(pj['__link_見積'], pj['見積'], dt['__link_見積'], dt['見積']);
 
   if (isUrlLike_(pjUrl)) return pjUrl;
 
@@ -432,17 +419,11 @@ function buildCaseInfoHtml_(pj, dt, type) {
   const rows = [];
   const workCategory = getRowCategory_(type, pj, dt);
 
-  const workplace = type === 'SV'
-    ? nz_(dt['作業形態'])
-    : '倉庫作業';
+  const workplace = type === 'SV' ? nz_(dt['作業形態']) : '倉庫作業';
 
-  const place = type === 'SV'
-    ? joinNonEmpty_([dt['現地']])
-    : '';
+  const place = type === 'SV' ? joinNonEmpty_([dt['現地']]) : '';
 
-  const due = type === 'SV'
-    ? (nz_(pj['検収予定']) || nz_(dt['検収予定']))
-    : nz_(dt['検収予定']);
+  const due = type === 'SV' ? nz_(pj['検収予定']) || nz_(dt['検収予定']) : nz_(dt['検収予定']);
 
   rows.push(infoLineHtml_('作業カテゴリ', workCategory));
   rows.push(infoLineHtml_('作業形態', workplace));
@@ -477,7 +458,7 @@ function buildPeriodHtml_(dt, type) {
     const caseText = '未設定';
     const inText = rangeText_(dt['社内作業開始日'], dt['社内作業終了日']);
     const outText = rangeText_(dt['現地作業開始日'], dt['現地作業終了日']);
-    const warn = (!nz_(dt['完了予定']) && !nz_(dt['検収予定'])) ? '完了予定未設定' : '';
+    const warn = !nz_(dt['完了予定']) && !nz_(dt['検収予定']) ? '完了予定未設定' : '';
 
     return `
       <div class="wp-wrap-simple">
@@ -530,13 +511,7 @@ function getRowMemberNames_(pj, dt) {
   const support2 = splitMemberNames_(dt['サポート2']);
   const support3 = splitMemberNames_(dt['サポート3']);
 
-  return uniqueNonEmpty_([
-    ...supervisor,
-    ...manager,
-    ...support1,
-    ...support2,
-    ...support3,
-  ]);
+  return uniqueNonEmpty_([...supervisor, ...manager, ...support1, ...support2, ...support3]);
 }
 
 /** -----------------------------
@@ -565,7 +540,9 @@ function wpRowHtml_(label, value) {
     <div class="wp-row-simple">
       <div class="wp-label-simple">${escapeHtml_(label)}</div>
       <div class="wp-lane-simple">
-        <div class="wp-bar-simple"><span class="wp-bar-text-simple">${escapeHtml_(value)}</span></div>
+        <div class="wp-bar-simple"><span class="wp-bar-text-simple">${escapeHtml_(
+          value
+        )}</span></div>
       </div>
     </div>
   `;
@@ -598,13 +575,13 @@ function rangeText_(start, end) {
   return '';
 }
 
-function parseStatus_(text){
+function parseStatus_(text) {
   const s = String(text || '').trim();
   const m = s.match(/^【([^】]+)】\s*(.*)$/);
 
   return {
     kind: m ? m[1] : '',
-    label: m ? m[2] : s
+    label: m ? m[2] : s,
   };
 }
 
@@ -696,7 +673,9 @@ function getCellLinkUrl_(rt) {
  * common
  * ----------------------------- */
 function normalizeHeader_(v) {
-  return String(v == null ? '' : v).replace(/\r?\n/g, '').trim();
+  return String(v == null ? '' : v)
+    .replace(/\r?\n/g, '')
+    .trim();
 }
 
 function buildHeaderMap0_(headers) {
@@ -712,7 +691,10 @@ function stringifyCell_(v) {
 }
 
 function normalizeSearchText_(v) {
-  return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+  return String(v == null ? '' : v)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
 }
 
 function nz_(v) {

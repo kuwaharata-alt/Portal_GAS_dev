@@ -1,16 +1,16 @@
 <!-- ===== Unified Modal ===== -->
-<div id="modalStatus"
-     class="modal"
-     aria-hidden="true"
-     data-key=""
-     data-type=""
-     data-idxcustomer=""
-     data-tab="detail">
-
+<div
+  id="modalStatus"
+  class="modal"
+  aria-hidden="true"
+  data-key=""
+  data-type=""
+  data-idxcustomer=""
+  data-tab="detail"
+>
   <div class="modal-bg" onclick="closeUnifiedModal_()"></div>
 
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="stTitle">
-
     <!-- Header -->
     <div class="modal-head">
       <div>
@@ -18,13 +18,19 @@
         <div id="stMeta" class="modal-meta"></div>
         <div id="stErr" class="modal-err"></div>
       </div>
-      <button type="button" class="iconbtn" onclick="closeUnifiedModal_()" aria-label="閉じる">×</button>
+      <button type="button" class="iconbtn" onclick="closeUnifiedModal_()" aria-label="閉じる">
+        ×
+      </button>
     </div>
 
     <!-- Top Tabs -->
     <div id="stTabs" class="st-tabs">
-      <button type="button" class="st-tab" data-tab="detail" onclick="switchUnifiedTab_('detail')">詳細</button>
-      <button type="button" class="st-tab" data-tab="status" onclick="switchUnifiedTab_('status')">更新</button>
+      <button type="button" class="st-tab" data-tab="detail" onclick="switchUnifiedTab_('detail')">
+        詳細
+      </button>
+      <button type="button" class="st-tab" data-tab="status" onclick="switchUnifiedTab_('status')">
+        更新
+      </button>
       <span class="st-tab-spacer"></span>
     </div>
 
@@ -46,9 +52,15 @@
 
     <div class="modal-foot">
       <button type="button" class="btn" onclick="closeUnifiedModal_()">キャンセル</button>
-      <button type="button" id="btnUnifiedSave" class="btn btn-primary" onclick="saveUnifiedModal_()">保存</button>
+      <button
+        type="button"
+        id="btnUnifiedSave"
+        class="btn btn-primary"
+        onclick="saveUnifiedModal_()"
+      >
+        保存
+      </button>
     </div>
-
   </div>
 </div>
 
@@ -92,10 +104,12 @@
       <span data-st="commentLabel">コメント</span>
     </div>
     <div class="st-ctrl">
-      <textarea class="fctrl st-comment"
-                data-st="comment"
-                rows="3"
-                placeholder="補足・連絡事項など"></textarea>
+      <textarea
+        class="fctrl st-comment"
+        data-st="comment"
+        rows="3"
+        placeholder="補足・連絡事項など"
+      ></textarea>
     </div>
   </div>
 </template>

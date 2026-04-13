@@ -1,0 +1,113 @@
+{
+    "root": true,
+    "env": {
+        "browser": true,
+        "es2021": true,
+        "node": true
+    },
+    "parserOptions": {
+        "ecmaVersion": 12,
+        "sourceType": "module"
+    },
+    "globals": {
+        "SpreadsheetApp": "readonly",
+        "Session": "readonly",
+        "Utilities": "readonly",
+        "Logger": "readonly",
+        "PropertiesService": "readonly",
+        "DriveApp": "readonly",
+        "CacheService": "readonly",
+        "ContentService": "readonly",
+        "MailApp": "readonly",
+        "UrlFetchApp": "readonly",
+        "CalendarApp": "readonly",
+        "HtmlService": "readonly"
+    },
+    "overrides": [
+        {
+            "files": [
+                "*.js"
+            ],
+            "globals": {
+                "norm_": "readonly",
+                "nz_": "readonly",
+                "getSS_": "readonly",
+                "INPUT_CONFIG": "readonly",
+                "VIEW_CONFIG": "readonly",
+                "WEBVIEW": "readonly",
+                "include": "readonly",
+                "getMasterSheet_": "readonly",
+                "listUniqueFromColumn_": "readonly",
+                "groupByTwoCols_": "readonly",
+                "normalizeCaseType_": "readonly",
+                "getDisplayCaseSheet_": "readonly",
+                "getActiveUserNameOrEmail_": "readonly",
+                "upsertByMapping_": "readonly",
+                "nowYmd_": "readonly",
+                "normalizeForClient_": "readonly",
+                "joinMultiValue_": "readonly",
+                "ymdSlashToDashSafe_": "readonly",
+                "splitMultiValueSafe_": "readonly",
+                "toYmdSlash_": "readonly",
+                "COMMON": "readonly",
+                "writeSameRowByCols_": "readonly",
+                "getPlanSheet_": "readonly",
+                "getHeaderMap_": "readonly",
+                "enumerateDates_": "readonly",
+                "normalizeText_": "readonly",
+                "getWeekdayJa_": "readonly",
+                "parseDateFlexible_": "readonly",
+                "firstDayOfYm_": "readonly",
+                "lastDayOfRange_": "readonly",
+                "formatDateKey_": "readonly",
+                "buildHeaderMap_": "readonly",
+                "buildCodeToRollupMap_": "readonly",
+                "getTaskSheet_": "readonly",
+                "getTaskHeaderMap_": "readonly",
+                "getTaskMemberHeaders_": "readonly",
+                "getTaskHeaders_": "readonly",
+                "formatInspectYm_": "readonly",
+                "STATUS_APP_CONFIG": "readonly",
+                "STATUS_APP_CONFIG": "readonly",
+                "findRowByKey_": "readonly",
+                "readRowAsObject_": "readonly",
+                "resolveBigRollupState_": "readonly",
+                "resolveCaseStatusByRule_": "readonly",
+                "apiGetCaseByKey_": "readonly",
+                "updateSv_": "readonly",
+                "api_getCaseDetail": "readonly",
+                "api_getMenuAuth": "readonly",
+                "getDisplayStatusSheet_": "readonly",
+                "getDisplayCaseSheet_": "readonly",
+                "findRowByKey_": "readonly",
+                "nowYmd_": "readonly",
+                "PLAN_APP": "readonly",
+                "COMMON": "readonly",
+                "getSs_": "readonly",
+                "getSS_": "readonly",
+                "api_getPlanHolidayList": "readonly",
+                "buildHeaderMap_": "readonly",
+                "buildCodeToRollupMap_": "readonly",
+                "buildIndex": "readonly",
+                "testIndexRows": "readonly",
+                "Apply_StatusValidation_SVCL": "readonly",
+                "api_getEdit": "readonly"
+            }
+        }
+    ],
+    "extends": [
+        "eslint:recommended",
+        "plugin:prettier/recommended"
+    ],
+    "rules": {
+        "no-unused-vars": [
+            "warn",
+            {
+                "argsIgnorePattern": "^_"
+            }
+        ],
+        "no-console": "off",
+        "no-useless-escape": "off",
+        "no-irregular-whitespace": "off"
+    }
+}

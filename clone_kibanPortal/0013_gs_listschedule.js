@@ -36,36 +36,36 @@ function caseWbsBuildPayload_(type) {
   const ss = getSS_('Display');
 
   const shCase = ss.getSheetByName(CASE_WBS_CONFIG.SHEET_CASE[type]);
-  const shSt   = ss.getSheetByName(CASE_WBS_CONFIG.SHEET_STATUS[type]);
+  const shSt = ss.getSheetByName(CASE_WBS_CONFIG.SHEET_STATUS[type]);
 
   if (!shCase) throw new Error(`シートが見つかりません: ${CASE_WBS_CONFIG.SHEET_CASE[type]}`);
-  if (!shSt)   throw new Error(`シートが見つかりません: ${CASE_WBS_CONFIG.SHEET_STATUS[type]}`);
+  if (!shSt) throw new Error(`シートが見つかりません: ${CASE_WBS_CONFIG.SHEET_STATUS[type]}`);
 
   const caseValues = shCase.getDataRange().getValues();
-  const stValues   = shSt.getDataRange().getValues();
+  const stValues = shSt.getDataRange().getValues();
 
   if (caseValues.length < 2) return { rows: [], members: [] };
-  if (stValues.length < 2)   return { rows: [], members: [] };
+  if (stValues.length < 2) return { rows: [], members: [] };
 
   const caseHead = caseValues[CASE_WBS_CONFIG.HEADER_ROW - 1];
-  const stHead   = stValues[CASE_WBS_CONFIG.HEADER_ROW - 1];
+  const stHead = stValues[CASE_WBS_CONFIG.HEADER_ROW - 1];
 
   const caseRows = caseValues.slice(CASE_WBS_CONFIG.HEADER_ROW);
-  const stRows   = stValues.slice(CASE_WBS_CONFIG.HEADER_ROW);
+  const stRows = stValues.slice(CASE_WBS_CONFIG.HEADER_ROW);
 
   const cmap = caseWbsHeaderMap_(caseHead);
   const smap = caseWbsHeaderMap_(stHead);
 
   const caseIdx = {
-    key:        caseWbsRequireCol_(cmap, '見積番号'),
-    customer:   caseWbsRequireCol_(cmap, '顧客名'),
-    category:   caseWbsRequireCol_(cmap, '分類'),
-    summary:    caseWbsRequireCol_(cmap, '案件概要'),
-    estimate:   caseWbsRequireCol_(cmap, '見積'),
+    key: caseWbsRequireCol_(cmap, '見積番号'),
+    customer: caseWbsRequireCol_(cmap, '顧客名'),
+    category: caseWbsRequireCol_(cmap, '分類'),
+    summary: caseWbsRequireCol_(cmap, '案件概要'),
+    estimate: caseWbsRequireCol_(cmap, '見積'),
     supervisor: caseWbsRequireCol_(cmap, '監督者'),
-    manager:    caseWbsRequireCol_(cmap, '管理者'),
-    support:    caseWbsRequireCol_(cmap, 'サポート'),
-    openClose:  caseWbsRequireCol_(cmap, 'open/close'),
+    manager: caseWbsRequireCol_(cmap, '管理者'),
+    support: caseWbsRequireCol_(cmap, 'サポート'),
+    openClose: caseWbsRequireCol_(cmap, 'open/close'),
   };
 
   const stKeyIdx = caseWbsRequireCol_(smap, '見積番号');
@@ -76,7 +76,7 @@ function caseWbsBuildPayload_(type) {
   Logger.log('CASE IDX=' + JSON.stringify(caseIdx));
 
   const stByKey = {};
-  stRows.forEach(r => {
+  stRows.forEach((r) => {
     const key = caseWbsNz_(r[stKeyIdx]);
     if (!key) return;
     stByKey[key] = r;
@@ -99,18 +99,18 @@ function caseWbsBuildPayload_(type) {
       if (rowType && rowType !== 'CL' && rowType !== 'PC') continue;
     }
 
-    const customer   = caseWbsNz_(r[caseIdx.customer]);
-    const summary    = caseWbsNz_(r[caseIdx.summary]);
-    const estimate   = caseWbsNz_(r[caseIdx.estimate]);
-    const openClose  = caseWbsNz_(r[caseIdx.openClose]);
+    const customer = caseWbsNz_(r[caseIdx.customer]);
+    const summary = caseWbsNz_(r[caseIdx.summary]);
+    const estimate = caseWbsNz_(r[caseIdx.estimate]);
+    const openClose = caseWbsNz_(r[caseIdx.openClose]);
     const supervisor = caseWbsNz_(r[caseIdx.supervisor]);
-    const manager    = caseWbsNz_(r[caseIdx.manager]);
-    const support    = caseWbsNz_(r[caseIdx.support]);
+    const manager = caseWbsNz_(r[caseIdx.manager]);
+    const support = caseWbsNz_(r[caseIdx.support]);
 
     const st = stByKey[key] || [];
 
-    [supervisor, manager, support].forEach(v => {
-      if (v) caseWbsSplitMembers_(v).forEach(name => memberSet.add(name));
+    [supervisor, manager, support].forEach((v) => {
+      if (v) caseWbsSplitMembers_(v).forEach((name) => memberSet.add(name));
     });
 
     out.push({
@@ -132,27 +132,31 @@ function caseWbsBuildPayload_(type) {
           category: '案件',
           status: caseWbsNz_(caseWbsPickFirst_(st, smap, ['案件ST'])),
           start: caseWbsToDateStr_(caseWbsPickFirst_(st, smap, ['案件管理_作業期間：開始'])),
-          end:   caseWbsToDateStr_(caseWbsPickFirst_(st, smap, ['案件管理_作業期間：終了'])),
+          end: caseWbsToDateStr_(caseWbsPickFirst_(st, smap, ['案件管理_作業期間：終了'])),
         },
         {
           category: '社内',
           status: caseWbsNz_(caseWbsPickFirst_(st, smap, ['社内ST'])),
           start: caseWbsToDateStr_(caseWbsPickFirst_(st, smap, ['社内作業_作業期間：開始'])),
-          end:   caseWbsToDateStr_(caseWbsPickFirst_(st, smap, ['社内作業_作業期間：終了'])),
+          end: caseWbsToDateStr_(caseWbsPickFirst_(st, smap, ['社内作業_作業期間：終了'])),
         },
         {
           category: '社外',
           status: caseWbsNz_(caseWbsPickFirst_(st, smap, ['現地ST'])),
-          start: caseWbsToDateStr_(caseWbsPickFirst_(st, smap, [
-            '現地・リモート作業_作業期間：開始',
-            '現地作業_作業期間：開始'
-          ])),
-          end: caseWbsToDateStr_(caseWbsPickFirst_(st, smap, [
-            '現地・リモート作業_作業期間：終了',
-            '現地作業_作業期間：終了'
-          ])),
-        }
-      ]
+          start: caseWbsToDateStr_(
+            caseWbsPickFirst_(st, smap, [
+              '現地・リモート作業_作業期間：開始',
+              '現地作業_作業期間：開始',
+            ])
+          ),
+          end: caseWbsToDateStr_(
+            caseWbsPickFirst_(st, smap, [
+              '現地・リモート作業_作業期間：終了',
+              '現地作業_作業期間：終了',
+            ])
+          ),
+        },
+      ],
     });
   }
 
@@ -224,9 +228,9 @@ function caseWbsSplitMembers_(v) {
   if (!s || s === 'ー') return [];
   return s
     .split(/[\/,、，\n\r\t・]/)
-    .map(x => String(x || '').trim())
+    .map((x) => String(x || '').trim())
     .filter(Boolean)
-    .filter(x => x !== 'ー');
+    .filter((x) => x !== 'ー');
 }
 
 function caseWbsUnique_(arr) {

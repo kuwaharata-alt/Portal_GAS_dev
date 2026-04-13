@@ -1,12 +1,17 @@
 <section id="panel-list" class="panel">
-
   <div class="filter-bar">
-
     <!-- ステータス -->
     <div class="filter-item">
       <div class="filter-label">ステータス</div>
       <div class="dd filter-dd" id="statusDD">
-        <button type="button" class="dd-btn filter-control" id="statusBtn" onclick="toggleStatusDD_(event)">すべて</button>
+        <button
+          type="button"
+          class="dd-btn filter-control"
+          id="statusBtn"
+          onclick="toggleStatusDD_(event)"
+        >
+          すべて
+        </button>
         <div class="dd-menu" id="statusMenu"></div>
       </div>
     </div>
@@ -14,11 +19,7 @@
     <!-- カテゴリー -->
     <div class="filter-item">
       <label class="filter-label">ｶﾃｺﾞﾘｰ</label>
-      <select
-        id="categoryFilter"
-        class="filter-control"
-        onchange="onListFilterChanged_()"
-      >
+      <select id="categoryFilter" class="filter-control" onchange="onListFilterChanged_()">
         <option value="">すべて</option>
       </select>
     </div>
@@ -27,7 +28,12 @@
     <div class="filter-item">
       <label class="filter-label">担当者</label>
       <div class="dd filter-dd" id="memberDD">
-        <button type="button" class="dd-btn filter-control" id="memberBtn" onclick="toggleMemberDD_(event)">
+        <button
+          type="button"
+          class="dd-btn filter-control"
+          id="memberBtn"
+          onclick="toggleMemberDD_(event)"
+        >
           すべて
         </button>
         <div class="dd-menu" id="memberMenu"></div>
@@ -37,12 +43,7 @@
     <!-- 完了予定月 -->
     <div class="filter-item">
       <label class="filter-label">完了予定月</label>
-      <input
-        type="month"
-        id="planMonth"
-        class="filter-control"
-        onchange="onListFilterChanged_()"
-      />
+      <input type="month" id="planMonth" class="filter-control" onchange="onListFilterChanged_()" />
     </div>
 
     <div class="panel-toolbar-right">
@@ -50,7 +51,7 @@
         id="q"
         type="search"
         placeholder="検索（見積番号 / 顧客名 / 案件概要 など）"
-        style="min-width:320px;"
+        style="min-width: 320px"
         onkeydown="if(event.key==='Enter'){ loadCases_(); }"
       />
       <button class="primary" type="button" onclick="loadCases_()">検索</button>
@@ -62,13 +63,13 @@
     <div class="table-shell list-table-shell">
       <table id="tbl" class="list-table">
         <colgroup>
-          <col style="width:5%">
-          <col style="width:10%">
-          <col style="width:15%">
-          <col style="width:15%">
-          <col style="width:15%">
-          <col style="width:20%">
-          <col style="width:25%">
+          <col style="width: 5%" />
+          <col style="width: 10%" />
+          <col style="width: 15%" />
+          <col style="width: 15%" />
+          <col style="width: 15%" />
+          <col style="width: 20%" />
+          <col style="width: 25%" />
         </colgroup>
         <thead>
           <tr id="thead"></tr>

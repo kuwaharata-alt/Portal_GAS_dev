@@ -5,7 +5,7 @@
 const DETAIL_APP_CONFIG = {
   HEADER_ROW: 1,
   KEY_HEADER: '見積番号',
-  TZ: 'Asia/Tokyo'
+  TZ: 'Asia/Tokyo',
 };
 
 function api_getCaseDetail(type, mitsuNo) {
@@ -43,11 +43,13 @@ function api_getCaseDetail(type, mitsuNo) {
     const statusRowNo = findRowByKey_(shStatus, colKeyStatus, mitsuNo, headerRow + 1);
 
     const baseRowObj = readRowAsObject_(shBase, baseRowNo, headerRow, false) || {};
-    const statusRowObj = statusRowNo ? readRowAsObject_(shStatus, statusRowNo, headerRow, false) : {};
+    const statusRowObj = statusRowNo
+      ? readRowAsObject_(shStatus, statusRowNo, headerRow, false)
+      : {};
 
     return {
       ok: true,
-      data: buildCaseDetailPayload_(type, baseRowObj, statusRowObj)
+      data: buildCaseDetailPayload_(type, baseRowObj, statusRowObj),
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -58,7 +60,7 @@ function buildCaseDetailPayload_(type, b, s) {
   b = b || {};
   s = s || {};
 
-  const outsidePrefix = (normalizeCaseType_(type) === 'CL') ? '現地作業' : '現地・リモート作業';
+  const outsidePrefix = normalizeCaseType_(type) === 'CL' ? '現地作業' : '現地・リモート作業';
 
   return {
     title: '［' + (b['見積番号'] || '') + '］' + (b['顧客名'] || '') + '｜' + (b['案件概要'] || ''),
@@ -124,7 +126,7 @@ function buildCaseDetailPayload_(type, b, s) {
     updatedAt: fmtDetailDate_(b['updated_at'] || s['updated_at']),
     updatedBy: b['updated_by'] || '',
     rev: b['rev'] || '',
-    deleted: b['deleted'] || ''
+    deleted: b['deleted'] || '',
   };
 }
 
@@ -142,14 +144,23 @@ function fmtDetailDate_(v) {
  * 保存後に案件管理表へ反映する表示文
  * ========================= */
 
-function syncCaseSheetAfterStatusSave_(type, rowNoM, shM, hmM, master, statusMap, naSet, currentCode) {
+function syncCaseSheetAfterStatusSave_(
+  type,
+  rowNoM,
+  shM,
+  hmM,
+  master,
+  statusMap,
+  naSet,
+  currentCode
+) {
   const updater = getActiveUserNameOrEmail_();
 
-  const inBig   = '社内作業';
-  const outBig  = (normalizeCaseType_(type) === 'CL') ? '現地作業' : '現地・リモート作業';
-  const docBig  = 'ドキュメント';
+  const inBig = '社内作業';
+  const outBig = normalizeCaseType_(type) === 'CL' ? '現地作業' : '現地・リモート作業';
+  const docBig = 'ドキュメント';
 
-  const inSt  = resolveBigRollupState_(master, statusMap, naSet, inBig);
+  const inSt = resolveBigRollupState_(master, statusMap, naSet, inBig);
   const outSt = resolveBigRollupState_(master, statusMap, naSet, outBig);
   const docSt = hasBigInMaster_(master, docBig)
     ? resolveBigRollupState_(master, statusMap, naSet, docBig)
@@ -159,7 +170,7 @@ function syncCaseSheetAfterStatusSave_(type, rowNoM, shM, hmM, master, statusMap
 
   const summaryText = [
     `案件ST：${caseSt || ''}`,
-    `社内：${inSt || ''}　現地：${outSt || ''}` + (docSt ? `　Doc.：${docSt}` : '')
+    `社内：${inSt || ''}　現地：${outSt || ''}` + (docSt ? `　Doc.：${docSt}` : ''),
   ].join('\n');
 
   const updates = {};
@@ -174,7 +185,7 @@ function syncCaseSheetAfterStatusSave_(type, rowNoM, shM, hmM, master, statusMap
   if (hmM['社内ST']) updates[hmM['社内ST']] = inSt || '';
   if (hmM['現地ST']) updates[hmM['現地ST']] = outSt || '';
   if (hmM['Doc.ST']) updates[hmM['Doc.ST']] = docSt || '';
-  if (hmM['DocST'])  updates[hmM['DocST']]  = docSt || '';
+  if (hmM['DocST']) updates[hmM['DocST']] = docSt || '';
 
   // メタ
   if (hmM[STATUS_APP_CONFIG.UPDATE_AT_HEADER]) {
@@ -187,18 +198,18 @@ function syncCaseSheetAfterStatusSave_(type, rowNoM, shM, hmM, master, statusMap
     updates[hmM[STATUS_APP_CONFIG.CURRENT_CODE_HEADER]] = currentCode || '';
   }
   if (hmM['open/close']) {
-    updates[hmM['open/close']] = (caseSt === '案件クローズ') ? 'close' : 'open';
+    updates[hmM['open/close']] = caseSt === '案件クローズ' ? 'close' : 'open';
   }
 
   const cols = Object.keys(updates).map(Number).filter(Boolean);
   if (!cols.length) return;
 
-  writeSameRowByCols_(shM, rowNoM, cols, col => updates[col]);
+  writeSameRowByCols_(shM, rowNoM, cols, (col) => updates[col]);
 }
 
 function buildCodeToSmallMap_(masterRows) {
   const map = {};
-  (masterRows || []).forEach(r => {
+  (masterRows || []).forEach((r) => {
     map[String(r.code)] = norm_(r.small);
   });
   return map;
@@ -206,7 +217,7 @@ function buildCodeToSmallMap_(masterRows) {
 
 function buildCodeToRollupMap_(masterRows) {
   const map = {};
-  (masterRows || []).forEach(r => {
+  (masterRows || []).forEach((r) => {
     const code = String(r.code || '').trim();
     if (!code) return;
 
@@ -217,7 +228,7 @@ function buildCodeToRollupMap_(masterRows) {
 }
 
 function getDefaultSmallForMid_(options) {
-  const d = (options || []).find(o => !!o.is_default);
+  const d = (options || []).find((o) => !!o.is_default);
   return d ? norm_(d.small) : '未着手';
 }
 
@@ -226,15 +237,15 @@ function getBigState_(master, statusMap, bigName, naSet) {
   if (!bigName) return '未着手';
   if (naSet && naSet[bigName]) return 'ー';
 
-  const g = (master.groups || []).find(x => norm_(x.big) === bigName);
+  const g = (master.groups || []).find((x) => norm_(x.big) === bigName);
   if (!g) return '未着手';
 
   const code2small = buildCodeToSmallMap_(master.rows || []);
   const code2rollup = buildCodeToRollupMap_(master.rows || []);
   const states = [];
 
-  (g.mids || []).forEach(m => {
-    const optSmalls = (m.options || []).map(o => norm_(o.small));
+  (g.mids || []).forEach((m) => {
+    const optSmalls = (m.options || []).map((o) => norm_(o.small));
     const hasStatusLike = optSmalls.length > 0;
     if (!hasStatusLike) return;
 
@@ -245,7 +256,7 @@ function getBigState_(master, statusMap, bigName, naSet) {
     if (norm_(v) === 'ー') {
       state = 'ー';
     } else if (v == null || norm_(v) === '') {
-      const def = (m.options || []).find(o => !!o.is_default);
+      const def = (m.options || []).find((o) => !!o.is_default);
       if (def) {
         state = code2rollup[String(def.code)] || normalizeStateFallback_(def.small);
       } else {
@@ -260,9 +271,9 @@ function getBigState_(master, statusMap, bigName, naSet) {
   });
 
   if (states.length === 0) return '未着手';
-  if (states.every(s => s === 'ー')) return 'ー';
-  if (states.every(s => s === '完了')) return '完了';
-  if (states.every(s => s === '未着手')) return '未着手';
+  if (states.every((s) => s === 'ー')) return 'ー';
+  if (states.every((s) => s === '完了')) return '完了';
+  if (states.every((s) => s === '未着手')) return '未着手';
   return '対応中';
 }
 
@@ -271,8 +282,20 @@ function normalizeStateFallback_(s) {
   if (!s) return '未着手';
   if (s === 'ー' || s === '-' || s === '—') return 'ー';
   if (s.indexOf('完了') !== -1) return '完了';
-  if (s.indexOf('対応中') !== -1 || s.indexOf('作業中') !== -1 || s.indexOf('レビュー') !== -1 || s.indexOf('修正中') !== -1) return '対応中';
-  if (s.indexOf('未着手') !== -1 || s.indexOf('未入荷') !== -1 || s.indexOf('対応有') !== -1 || s.indexOf('固定') !== -1) return '未着手';
+  if (
+    s.indexOf('対応中') !== -1 ||
+    s.indexOf('作業中') !== -1 ||
+    s.indexOf('レビュー') !== -1 ||
+    s.indexOf('修正中') !== -1
+  )
+    return '対応中';
+  if (
+    s.indexOf('未着手') !== -1 ||
+    s.indexOf('未入荷') !== -1 ||
+    s.indexOf('対応有') !== -1 ||
+    s.indexOf('固定') !== -1
+  )
+    return '未着手';
   return '未着手';
 }
 
@@ -301,10 +324,10 @@ function getMidState_(master, statusMap, bigName, midName) {
   bigName = norm_(bigName);
   midName = norm_(midName);
 
-  const g = (master.groups || []).find(x => norm_(x.big) === bigName);
+  const g = (master.groups || []).find((x) => norm_(x.big) === bigName);
   if (!g) return '未着手';
 
-  const m = (g.mids || []).find(x => norm_(x.mid) === midName);
+  const m = (g.mids || []).find((x) => norm_(x.mid) === midName);
   if (!m) return '未着手';
 
   const code2small = buildCodeToSmallMap_(master.rows || []);
@@ -316,7 +339,7 @@ function getMidState_(master, statusMap, bigName, midName) {
   if (norm_(v) === 'ー') {
     state = 'ー';
   } else if (v == null || norm_(v) === '') {
-    const def = (m.options || []).find(o => !!o.is_default);
+    const def = (m.options || []).find((o) => !!o.is_default);
     if (def) {
       state = code2rollup[String(def.code)] || normalizeStateFallback_(def.small);
     } else {
@@ -333,31 +356,10 @@ function getMidState_(master, statusMap, bigName, midName) {
 function summarizeStates_(states) {
   states = (states || []).filter(Boolean);
   if (states.length === 0) return '未着手';
-  if (states.every(s => s === 'ー')) return 'ー';
-  if (states.every(s => s === '完了')) return '完了';
-  if (states.every(s => s === '未着手')) return '未着手';
+  if (states.every((s) => s === 'ー')) return 'ー';
+  if (states.every((s) => s === '完了')) return '完了';
+  if (states.every((s) => s === '未着手')) return '未着手';
   return '対応中';
-}
-
-function buildCodeToRollupMap_(masterRows) {
-  const map = {};
-  (masterRows || []).forEach(r => {
-    const code = String(r.code || '').trim();
-    if (!code) return;
-    const rollup = norm_(r.rollup_state || r['集計状態'] || '');
-    map[code] = rollup || '';
-  });
-  return map;
-}
-
-function normalizeStateFallback_(s) {
-  s = norm_(s);
-  if (!s) return '未着手';
-  if (s === 'ー' || s === '-' || s === '—') return 'ー';
-  if (s.indexOf('完了') !== -1) return '完了';
-  if (s.indexOf('対応中') !== -1 || s.indexOf('作業中') !== -1 || s.indexOf('レビュー') !== -1 || s.indexOf('修正中') !== -1) return '対応中';
-  if (s.indexOf('未着手') !== -1 || s.indexOf('未入荷') !== -1 || s.indexOf('対応有') !== -1 || s.indexOf('固定') !== -1) return '未着手';
-  return '未着手';
 }
 
 function buildStatusTextForView_(type, master, statusMap, naSet) {
@@ -367,12 +369,7 @@ function buildStatusTextForView_(type, master, statusMap, naSet) {
   const onSt = getBigState_(master, statusMap, onBig, naSet);
   const docSt = getBigState_(master, statusMap, 'ドキュメント', naSet);
 
-  return [
-    '案件ST：' + caseSt,
-    '社内：' + inSt,
-    '現地：' + onSt,
-    'Doc.：' + docSt
-  ].join('\n');
+  return ['案件ST：' + caseSt, '社内：' + inSt, '現地：' + onSt, 'Doc.：' + docSt].join('\n');
 }
 
 function buildCommentsNoteText_(type, statusMap) {
@@ -407,16 +404,14 @@ function commentColName_(type, big) {
   if (big === '現地・リモート作業' || big === '現地作業') {
     return type === 'CL' ? '現地作業_コメント' : '現地・リモート作業_コメント';
   }
-  return big ? (big + '_コメント') : '';
+  return big ? big + '_コメント' : '';
 }
 
 function getCommentCol_(hm, type, big) {
   const primary = commentColName_(type, big);
   if (primary && hm[primary]) return hm[primary];
 
-  const alt = (primary === '現地作業_コメント')
-    ? '現地・リモート作業_コメント'
-    : '現地作業_コメント';
+  const alt = primary === '現地作業_コメント' ? '現地・リモート作業_コメント' : '現地作業_コメント';
 
   return hm[alt] || 0;
 }
@@ -437,7 +432,9 @@ function buildWorkSummary2Line_(row, headerMap) {
 }
 
 function cleanWorkStyleText_(s) {
-  return String(s || '').trim().replace(/[／/]/g, '・');
+  return String(s || '')
+    .trim()
+    .replace(/[／/]/g, '・');
 }
 
 function cleanPlaceText_(s) {
@@ -449,7 +446,7 @@ function cleanPlaceText_(s) {
 
   const prefs = String(m[1] || '')
     .split('/')
-    .map(x => x.trim())
+    .map((x) => x.trim())
     .filter(Boolean)
     .join(' ');
 
@@ -464,14 +461,14 @@ function getByHeader_(row, headerMap, headerName) {
 }
 
 function hasBigInMaster_(master, big) {
-  return (master?.groups || []).some(g => norm_(g.big) === norm_(big));
+  return (master?.groups || []).some((g) => norm_(g.big) === norm_(big));
 }
 
 function resolveCurrentCaseStatusLabel_(master, currentCode, fallback) {
   const code = norm_(currentCode);
   if (!code) return fallback || '';
 
-  const row = (master?.rows || []).find(r => norm_(r.code) === code);
+  const row = (master?.rows || []).find((r) => norm_(r.code) === code);
   if (!row) return fallback || '';
 
   return row.display || row.small || fallback || '';
@@ -483,36 +480,38 @@ function resolveBigSummaryState_(master, statusMap, naSet, big) {
 
   if (naSet && naSet[big]) return 'ー';
 
-  const group = (master?.groups || []).find(g => norm_(g.big) === big);
+  const group = (master?.groups || []).find((g) => norm_(g.big) === big);
   if (!group) return '';
 
   const mids = group.mids || [];
   if (!mids.length) return '';
 
-  const states = mids.map(m => {
-    const key = 'ST_' + big + '__' + m.mid;
-    const raw = statusMap[key];
-    return normalizeSummaryValueForCaseSheet_(raw, !!m.is_date);
-  }).filter(v => v !== '');
+  const states = mids
+    .map((m) => {
+      const key = 'ST_' + big + '__' + m.mid;
+      const raw = statusMap[key];
+      return normalizeSummaryValueForCaseSheet_(raw, !!m.is_date);
+    })
+    .filter((v) => v !== '');
 
   if (!states.length) return '未着手';
 
   // すべて対応無
-  if (states.every(v => v === 'ー')) return 'ー';
+  if (states.every((v) => v === 'ー')) return 'ー';
 
   // 1つでも対応中があれば対応中
-  if (states.some(v => v === '対応中')) return '対応中';
+  if (states.some((v) => v === '対応中')) return '対応中';
 
   // 完了と対応無のみで構成、かつ完了が1つでもあるなら完了
-  if (states.some(v => v === '完了') && states.every(v => v === '完了' || v === 'ー')) {
+  if (states.some((v) => v === '完了') && states.every((v) => v === '完了' || v === 'ー')) {
     return '完了';
   }
 
   // すべて未着手 or 対応無
-  if (states.every(v => v === '未着手' || v === 'ー')) return '未着手';
+  if (states.every((v) => v === '未着手' || v === 'ー')) return '未着手';
 
   // 完了・未着手が混在 → 対応中
-  if (states.some(v => v === '完了') && states.some(v => v === '未着手')) return '対応中';
+  if (states.some((v) => v === '完了') && states.some((v) => v === '未着手')) return '対応中';
 
   return '未着手';
 }
