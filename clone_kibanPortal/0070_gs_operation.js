@@ -15,10 +15,7 @@ function api_updateKado(payload) {
     const sh = ss.getSheetByName(sheetName);
     if (!sh) return { ok: false, error: `${sheetName} シートが見つかりません` };
 
-    const headers = sh
-      .getRange(1, 1, 1, sh.getLastColumn())
-      .getDisplayValues()[0]
-      .map((s) => String(s || '').trim());
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getDisplayValues()[0].map(s => String(s || '').trim());
 
     // 必須ヘッダー
     const idxCat = headers.indexOf('カテゴリ') + 1;
@@ -28,10 +25,7 @@ function api_updateKado(payload) {
     const idxUpd = headers.indexOf('更新日') + 1;
 
     if (!idxCat || !idxLevel || !idxPerm || !idxStat || !idxUpd) {
-      return {
-        ok: false,
-        error: 'ヘッダーが不足しています（カテゴリ/稼働率/期間/稼働状況/更新日）',
-      };
+      return { ok: false, error: 'ヘッダーが不足しています（カテゴリ/稼働率/期間/稼働状況/更新日）' };
     }
 
     const now = new Date();
@@ -85,9 +79,10 @@ function api_getOperationSheet(params) {
 
     const rows = values
       .map((v, i) => ({ r: i + 2, v }))
-      .filter((obj) => obj.v.some((c) => String(c || '').trim() !== ''));
+      .filter(obj => obj.v.some(c => String(c || '').trim() !== ''));
 
     return { ok: true, headers, rows };
+
   } catch (e) {
     return { ok: false, error: e.message || String(e) };
   }

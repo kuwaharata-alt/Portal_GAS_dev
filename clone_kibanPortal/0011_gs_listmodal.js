@@ -1,6 +1,3 @@
-/* global toInputDateValue_, openCloseFromCode_ */
-/* eslint no-unused-vars: "warn" */
-
 /** ======================================================================
  * Modal API
  * - 案件情報
@@ -16,17 +13,17 @@ const INPUT_CONFIG = {
   KEY_HEADER: '見積番号',
 
   MAPPING: {
-    作業難度: '作業難度',
-    作業形態: '作業形態',
-    現地作業場所: '現地作業場所',
-    最寄り: '最寄り',
-    住所: '住所',
-    作業内容: '作業内容',
-    台数: '台数',
-    監督者: '監督者',
-    管理者: '管理者',
-    サポート: 'サポート',
-    BP利用: 'BP利用',
+    '作業難度': '作業難度',
+    '作業形態': '作業形態',
+    '現地作業場所': '現地作業場所',
+    '最寄り': '最寄り',
+    '住所': '住所',
+    '作業内容': '作業内容',
+    '台数': '台数',
+    '監督者': '監督者',
+    '管理者': '管理者',
+    'サポート': 'サポート',
+    'BP利用': 'BP利用',
   },
 };
 
@@ -46,8 +43,8 @@ const STATUS_APP_CONFIG = {
 };
 
 const STATUS_MODAL_CACHE = {
-  MASTER_SEC: 300, // 5分
-  ROW_INDEX_SEC: 180, // 3分
+  MASTER_SEC: 300,     // 5分
+  ROW_INDEX_SEC: 180,  // 3分
 };
 
 const __STATUS_EXEC_CACHE = {
@@ -271,7 +268,7 @@ function loadStatusMasterRaw_(target) {
       target,
       rows: [],
       groups: [],
-      naOptions: STATUS_APP_CONFIG.NA_OPTIONS,
+      naOptions: STATUS_APP_CONFIG.NA_OPTIONS
     };
   }
 
@@ -293,10 +290,7 @@ function loadStatusMasterRaw_(target) {
   const colStHeader = headerMap['Status_Header'];
 
   if (!colTarget || !colCode || !colBig || !colMid || !colSmall) {
-    return {
-      ok: false,
-      error: 'マスタの必須列（対象/コード/大分類/中分類/小分類）が不足しています',
-    };
+    return { ok: false, error: 'マスタの必須列（対象/コード/大分類/中分類/小分類）が不足しています' };
   }
 
   const rows = [];
@@ -308,7 +302,7 @@ function loadStatusMasterRaw_(target) {
     const defRaw = colDefault ? r[colDefault - 1] : '';
     const defStr = norm_(defRaw).toUpperCase();
     const isDefault = defStr === 'TRUE';
-    const defaultValue = !isDefault && defStr !== 'FALSE' ? toYmdSlash_(defRaw, COMMON.TZ) : '';
+    const defaultValue = (!isDefault && defStr !== 'FALSE') ? toYmdSlash_(defRaw, COMMON.TZ) : '';
 
     rows.push({
       target: t,
@@ -325,7 +319,7 @@ function loadStatusMasterRaw_(target) {
       default_value: defaultValue,
       na_enable: colNaEnable ? String(r[colNaEnable - 1]).toUpperCase() === 'TRUE' : false,
       rollup_state: norm_(colRollup ? r[colRollup - 1] : ''),
-      status_header: norm_(colStHeader ? r[colStHeader - 1] : ''),
+      status_header: norm_(colStHeader ? r[colStHeader - 1] : '')
     });
   }
 
@@ -334,14 +328,14 @@ function loadStatusMasterRaw_(target) {
     target,
     rows,
     groups: buildGroups_(rows),
-    naOptions: STATUS_APP_CONFIG.NA_OPTIONS,
+    naOptions: STATUS_APP_CONFIG.NA_OPTIONS
   };
 }
 
 function buildGroups_(rows) {
   const bigMap = {};
 
-  (rows || []).forEach((r) => {
+  (rows || []).forEach(r => {
     if (!r.big) return;
 
     if (!bigMap[r.big]) {
@@ -349,7 +343,7 @@ function buildGroups_(rows) {
         big: r.big,
         sort: r.sort || 0,
         na_enable: !!r.na_enable,
-        midMap: {},
+        midMap: {}
       };
     } else if (r.na_enable) {
       bigMap[r.big].na_enable = true;
@@ -366,7 +360,7 @@ function buildGroups_(rows) {
         force: !!r.force,
         is_date: !!r.default_value,
         status_header: r.status_header || statusColName_(r.big, r.mid),
-        options: [],
+        options: []
       };
     }
 
@@ -387,23 +381,23 @@ function buildGroups_(rows) {
       is_closed: !!r.is_closed,
       is_color: !!r.is_color,
       is_default: !!r.is_default,
-      rollup_state: r.rollup_state || '',
+      rollup_state: r.rollup_state || ''
     });
   });
 
   return Object.keys(bigMap)
-    .map((k) => bigMap[k])
+    .map(k => bigMap[k])
     .sort((a, b) => (a.sort || 0) - (b.sort || 0))
-    .map((bm) => ({
+    .map(bm => ({
       big: bm.big,
       na_enable: !!bm.na_enable,
       mids: Object.keys(bm.midMap)
-        .map((k) => bm.midMap[k])
+        .map(k => bm.midMap[k])
         .sort((a, b) => (a.sort || 0) - (b.sort || 0))
-        .map((mm) => {
+        .map(mm => {
           mm.options.sort((a, b) => (a.sort || 0) - (b.sort || 0));
           return mm;
-        }),
+        })
     }));
 }
 
@@ -443,11 +437,11 @@ function buildCaseStatusResponse_(type, key, master) {
   const statusMap = {};
   const naGroups = {};
 
-  (master.groups || []).forEach((g) => {
+  (master.groups || []).forEach(g => {
     let allNa = true;
     let hasValue = false;
 
-    (g.mids || []).forEach((m) => {
+    (g.mids || []).forEach(m => {
       const colName = m.status_header || statusColName_(g.big, m.mid);
       const col = hmS[colName];
       if (!col) return;
@@ -468,7 +462,7 @@ function buildCaseStatusResponse_(type, key, master) {
     }
   });
 
-  getCommentTargetBigs_(type).forEach((big) => {
+  getCommentTargetBigs_(type).forEach(big => {
     const col = getCommentCol_(hmS, type, big);
     if (!col) return;
 
@@ -511,12 +505,7 @@ function api_saveCaseStatus(req) {
     const rowNo = findRowByKeyCached_(shS, colKeyS, key, 2);
     if (!rowNo) return { ok: false, error: '見積番号が見つかりません: ' + key };
 
-    const rowNoM = findRowByKeyCached_(
-      shM,
-      hmM[STATUS_APP_CONFIG.KEY_HEADER],
-      key,
-      STATUS_APP_CONFIG.CASE_HEADER_ROW + 1
-    );
+    const rowNoM = findRowByKeyCached_(shM, hmM[STATUS_APP_CONFIG.KEY_HEADER], key, STATUS_APP_CONFIG.CASE_HEADER_ROW + 1);
     if (!rowNoM) return { ok: false, error: '案件管理表に見積番号が見つかりません: ' + key };
 
     const master = getStatusMasterCached_(type);
@@ -547,14 +536,14 @@ function statusColName_(big, mid) {
 
 function buildNaSet_(naBigs) {
   const naSet = {};
-  (naBigs || []).forEach((b) => (naSet[norm_(b)] = true));
+  (naBigs || []).forEach(b => naSet[norm_(b)] = true);
   return naSet;
 }
 
 function clearTargetStatusCols_(shS, rowNo, hmS, master) {
   const uniq = {};
-  (master.groups || []).forEach((g) => {
-    (g.mids || []).forEach((m) => {
+  (master.groups || []).forEach(g => {
+    (g.mids || []).forEach(m => {
       const colName = m.status_header || statusColName_(g.big, m.mid);
       const col = hmS[colName];
       if (col) uniq[col] = true;
@@ -567,11 +556,11 @@ function clearTargetStatusCols_(shS, rowNo, hmS, master) {
 
 function applyNaMarks_(shS, rowNo, hmS, master, naSet) {
   const uniq = {};
-  (master.groups || []).forEach((g) => {
+  (master.groups || []).forEach(g => {
     const big = norm_(g.big);
     if (!big || !naSet[big]) return;
 
-    (g.mids || []).forEach((m) => {
+    (g.mids || []).forEach(m => {
       const colName = m.status_header || statusColName_(big, m.mid);
       const col = hmS[colName];
       if (col) uniq[col] = true;
@@ -586,7 +575,7 @@ function applyStatusValues_(shS, rowNo, hmS, statusMap, naSet, master) {
   const setMap = {};
   const uniq = {};
 
-  Object.keys(statusMap || {}).forEach((stKey) => {
+  Object.keys(statusMap || {}).forEach(stKey => {
     if (!String(stKey).startsWith('ST_')) return;
 
     const raw = String(stKey).slice(3);
@@ -607,14 +596,14 @@ function applyStatusValues_(shS, rowNo, hmS, statusMap, naSet, master) {
   });
 
   const cols = Object.keys(uniq).map(Number).filter(Boolean);
-  writeSameRowByCols_(shS, rowNo, cols, (col) => setMap[col]);
+  writeSameRowByCols_(shS, rowNo, cols, col => setMap[col]);
 }
 
 function writeCommentAndMeta_(shS, rowNo, hmS, type, statusMap, currentCode) {
   const updater = getActiveUserNameOrEmail_();
   const updates = {};
 
-  getCommentTargetBigs_(type).forEach((big) => {
+  getCommentTargetBigs_(type).forEach(big => {
     const col = getCommentCol_(hmS, type, big);
     if (!col) return;
     updates[col] = statusMap['CM_' + big] == null ? '' : String(statusMap['CM_' + big]);
@@ -639,7 +628,7 @@ function writeCommentAndMeta_(shS, rowNo, hmS, type, statusMap, currentCode) {
   const cols = Object.keys(updates).map(Number).filter(Boolean);
   if (!cols.length) return;
 
-  writeSameRowByCols_(shS, rowNo, cols, (col) => updates[col]);
+  writeSameRowByCols_(shS, rowNo, cols, col => updates[col]);
 }
 
 /** =========================
@@ -662,19 +651,10 @@ function writeSummaryColsToStatusSheet_(type, shS, rowNo, hmS, master, statusMap
   const cols = Object.keys(updates).map(Number).filter(Boolean);
   if (!cols.length) return;
 
-  writeSameRowByCols_(shS, rowNo, cols, (col) => updates[col]);
+  writeSameRowByCols_(shS, rowNo, cols, col => updates[col]);
 }
 
-function syncCaseSheetAfterStatusSave_(
-  type,
-  rowNoM,
-  shM,
-  hmM,
-  master,
-  statusMap,
-  naSet,
-  currentCode
-) {
+function syncCaseSheetAfterStatusSave_(type, rowNoM, shM, hmM, master, statusMap, naSet, currentCode) {
   const updater = getActiveUserNameOrEmail_();
 
   const caseSt = resolveCaseStatusByRule_(type, master, statusMap, naSet);
@@ -684,7 +664,7 @@ function syncCaseSheetAfterStatusSave_(
 
   const summaryText = [
     `案件ST：${caseSt || ''}`,
-    `社内：${inSt || ''}　現地：${outSt || ''}　Doc.：${docSt || ''}`,
+    `社内：${inSt || ''}　現地：${outSt || ''}　Doc.：${docSt || ''}`
   ].join('\n');
 
   const updates = {};
@@ -709,13 +689,13 @@ function syncCaseSheetAfterStatusSave_(
     updates[hmM[STATUS_APP_CONFIG.CURRENT_CODE_HEADER]] = currentCode || '';
   }
   if (hmM['open/close']) {
-    updates[hmM['open/close']] = caseSt === '案件クローズ' ? 'close' : 'open';
+    updates[hmM['open/close']] = (caseSt === '案件クローズ') ? 'close' : 'open';
   }
 
   const cols = Object.keys(updates).map(Number).filter(Boolean);
   if (!cols.length) return;
 
-  writeSameRowByCols_(shM, rowNoM, cols, (col) => updates[col]);
+  writeSameRowByCols_(shM, rowNoM, cols, col => updates[col]);
 }
 
 function getMidOptionByValue_(master, big, mid, rawValue) {
@@ -725,12 +705,11 @@ function getMidOptionByValue_(master, big, mid, rawValue) {
   const s = String(rawValue ?? '').trim();
   if (!s) return null;
 
-  return (
-    (mm.options || []).find(
-      (o) =>
-        norm_(o.code) === norm_(s) || norm_(o.small) === norm_(s) || norm_(o.display) === norm_(s)
-    ) || null
-  );
+  return (mm.options || []).find(o =>
+    norm_(o.code) === norm_(s) ||
+    norm_(o.small) === norm_(s) ||
+    norm_(o.display) === norm_(s)
+  ) || null;
 }
 
 function getMidResolvedLabel_(master, statusMap, big, mid) {
@@ -757,22 +736,14 @@ function resolveCaseStatusByRule_(type, master, statusMap, naSet) {
 
   // ① アサイン系
   const assignState = resolveMidsRollupState_(
-    master,
-    statusMap,
-    naSet,
-    assignBig,
-    getAssignRelatedMids_(master, type)
+    master, statusMap, naSet, assignBig, getAssignRelatedMids_(master, type)
   );
   if (assignState === '未着手') return '未アサイン';
   if (assignState === '対応中') return 'アサイン中';
 
   // ② 詳細確認
   const checkState = resolveMidsRollupState_(
-    master,
-    statusMap,
-    naSet,
-    checkBig,
-    getDetailCheckMids_(master, type)
+    master, statusMap, naSet, checkBig, getDetailCheckMids_(master, type)
   );
   if (checkState === '未着手' || checkState === '対応中') return '詳細確認中';
 
@@ -788,38 +759,23 @@ function resolveCaseStatusByRule_(type, master, statusMap, naSet) {
   // ⑤ 案件ステータス
   if (!hasBigInMaster_(master, caseStBig)) return '案件クローズ前対応中';
 
-  const caseTaiouRaw = getMidRawStatus_(statusMap, caseStBig, '案件対応');
-  const sagyoRaw = getMidRawStatus_(statusMap, caseStBig, '作業報告書');
-  const fbRaw = getMidRawStatus_(statusMap, caseStBig, 'FBアンケート');
+  const caseTaiouRaw   = getMidRawStatus_(statusMap, caseStBig, '案件対応');
+  const sagyoRaw       = getMidRawStatus_(statusMap, caseStBig, '作業報告書');
+  const fbRaw          = getMidRawStatus_(statusMap, caseStBig, 'FBアンケート');
 
   const caseTaiouLabel = getMidResolvedLabel_(master, statusMap, caseStBig, '案件対応');
-  const sagyoLabel = getMidResolvedLabel_(master, statusMap, caseStBig, '作業報告書');
-  const fbLabel = getMidResolvedLabel_(master, statusMap, caseStBig, 'FBアンケート');
+  const sagyoLabel     = getMidResolvedLabel_(master, statusMap, caseStBig, '作業報告書');
+  const fbLabel        = getMidResolvedLabel_(master, statusMap, caseStBig, 'FBアンケート');
 
   const caseTaiouNorm = normalizeSummaryStateStrict_(caseTaiouLabel);
-  const sagyoNorm = normalizeSummaryStateStrict_(sagyoLabel);
-  const fbNorm = normalizeSummaryStateStrict_(fbLabel);
+  const sagyoNorm     = normalizeSummaryStateStrict_(sagyoLabel);
+  const fbNorm        = normalizeSummaryStateStrict_(fbLabel);
 
   Logger.log(
     '[resolveCaseStatusByRule_] ' +
-      '案件 raw=' +
-      caseTaiouRaw +
-      ' label=' +
-      caseTaiouLabel +
-      ' norm=' +
-      caseTaiouNorm +
-      ' / 報告書 raw=' +
-      sagyoRaw +
-      ' label=' +
-      sagyoLabel +
-      ' norm=' +
-      sagyoNorm +
-      ' / FB raw=' +
-      fbRaw +
-      ' label=' +
-      fbLabel +
-      ' norm=' +
-      fbNorm
+    '案件 raw=' + caseTaiouRaw + ' label=' + caseTaiouLabel + ' norm=' + caseTaiouNorm +
+    ' / 報告書 raw=' + sagyoRaw + ' label=' + sagyoLabel + ' norm=' + sagyoNorm +
+    ' / FB raw=' + fbRaw + ' label=' + fbLabel + ' norm=' + fbNorm
   );
 
   // 案件対応が SE対応完了 なら専用ステータス
@@ -856,10 +812,10 @@ function getMidRawStatus_(statusMap, big, mid) {
 
 function getDetailCheckMids_(master, type) {
   const big = '案件確認';
-  const group = (master?.groups || []).find((g) => norm_(g.big) === big);
+  const group = (master?.groups || []).find(g => norm_(g.big) === big);
   if (!group) return ['詳細確認'];
 
-  const mids = (group.mids || []).map((m) => norm_(m.mid));
+  const mids = (group.mids || []).map(m => norm_(m.mid));
   const out = [];
 
   if (mids.includes('詳細確認')) out.push('詳細確認');
@@ -873,15 +829,13 @@ function resolveBigRollupState_(master, statusMap, naSet, big) {
 
   if (naSet && naSet[big]) return 'ー';
 
-  const group = (master?.groups || []).find((g) => norm_(g.big) === big);
+  const group = (master?.groups || []).find(g => norm_(g.big) === big);
   if (!group) return '';
 
-  const mids = (group.mids || []).filter((m) => !m.is_date);
+  const mids = (group.mids || []).filter(m => !m.is_date);
   if (!mids.length) return '';
 
-  const states = mids
-    .map((m) => resolveMidRollupState_(master, statusMap, naSet, big, m.mid))
-    .filter(Boolean);
+  const states = mids.map(m => resolveMidRollupState_(master, statusMap, naSet, big, m.mid)).filter(Boolean);
   return mergeStatesToRollup_(states);
 }
 
@@ -892,18 +846,18 @@ function resolveMidsRollupState_(master, statusMap, naSet, big, midsTarget) {
   if (naSet && naSet[big]) return 'ー';
 
   const targetSet = {};
-  (midsTarget || []).forEach((m) => (targetSet[norm_(m)] = true));
+  (midsTarget || []).forEach(m => targetSet[norm_(m)] = true);
 
-  const group = (master?.groups || []).find((g) => norm_(g.big) === big);
+  const group = (master?.groups || []).find(g => norm_(g.big) === big);
   if (!group) return '';
 
-  const mids = (group.mids || []).filter((m) => !m.is_date).filter((m) => targetSet[norm_(m.mid)]);
+  const mids = (group.mids || [])
+    .filter(m => !m.is_date)
+    .filter(m => targetSet[norm_(m.mid)]);
 
   if (!mids.length) return '';
 
-  const states = mids
-    .map((m) => resolveMidRollupState_(master, statusMap, naSet, big, m.mid))
-    .filter(Boolean);
+  const states = mids.map(m => resolveMidRollupState_(master, statusMap, naSet, big, m.mid)).filter(Boolean);
   return mergeStatesToRollup_(states);
 }
 
@@ -932,8 +886,10 @@ function resolveMidRollupState_(master, statusMap, naSet, big, mid) {
   }
 
   // code / small / display のどれでも引けるようにする
-  const opt = (mm.options || []).find(
-    (o) => norm_(o.code) === s || norm_(o.small) === s || norm_(o.display) === s
+  const opt = (mm.options || []).find(o =>
+    norm_(o.code) === s ||
+    norm_(o.small) === s ||
+    norm_(o.display) === s
   );
 
   // summary判定は業務ルール優先
@@ -945,15 +901,15 @@ function resolveMidRollupState_(master, statusMap, naSet, big, mid) {
 }
 
 function mergeStatesToRollup_(states) {
-  const arr = (states || []).filter((v) => v !== '');
+  const arr = (states || []).filter(v => v !== '');
   if (!arr.length) return '未着手';
 
-  if (arr.every((v) => v === 'ー')) return 'ー';
-  if (arr.every((v) => v === '完了' || v === 'ー') && arr.some((v) => v === '完了')) return '完了';
-  if (arr.every((v) => v === '対応無' || v === 'ー')) return '完了';
-  if (arr.every((v) => v === '未着手' || v === 'ー')) return '未着手';
-  if (arr.some((v) => v === '対応中')) return '対応中';
-  if (arr.some((v) => v === '完了') && arr.some((v) => v === '未着手')) return '対応中';
+  if (arr.every(v => v === 'ー')) return 'ー';
+  if (arr.every(v => v === '完了' || v === 'ー') && arr.some(v => v === '完了')) return '完了';
+  if (arr.every(v => v === '対応無' || v === 'ー')) return '完了';
+  if (arr.every(v => v === '未着手' || v === 'ー')) return '未着手';
+  if (arr.some(v => v === '対応中')) return '対応中';
+  if (arr.some(v => v === '完了') && arr.some(v => v === '未着手')) return '対応中';
 
   return '未着手';
 }
@@ -968,12 +924,22 @@ function normalizeSummaryStateStrict_(s) {
   if (s.includes('対応無')) return '完了';
 
   // 未着手系
-  if (s.includes('未着手') || s.includes('未入荷') || s.includes('未実施') || s.includes('待ち')) {
+  if (
+    s.includes('未着手') ||
+    s.includes('未入荷') ||
+    s.includes('未実施') ||
+    s.includes('待ち')
+  ) {
     return '未着手';
   }
 
   // 完了系
-  if (s.includes('完了') || s.includes('済') || s.includes('クローズ') || s.includes('機器無')) {
+  if (
+    s.includes('完了') ||
+    s.includes('済') ||
+    s.includes('クローズ') ||
+    s.includes('機器無')
+  ) {
     return '完了';
   }
 
@@ -982,9 +948,9 @@ function normalizeSummaryStateStrict_(s) {
 }
 
 function findMidMaster_(master, big, mid) {
-  const group = (master?.groups || []).find((g) => norm_(g.big) === norm_(big));
+  const group = (master?.groups || []).find(g => norm_(g.big) === norm_(big));
   if (!group) return null;
-  return (group.mids || []).find((m) => norm_(m.mid) === norm_(mid)) || null;
+  return (group.mids || []).find(m => norm_(m.mid) === norm_(mid)) || null;
 }
 
 function getStatusHeaderByBigMid_(master, big, mid) {
@@ -993,7 +959,7 @@ function getStatusHeaderByBigMid_(master, big, mid) {
 }
 
 function hasBigInMaster_(master, big) {
-  return (master?.groups || []).some((g) => norm_(g.big) === norm_(big));
+  return (master?.groups || []).some(g => norm_(g.big) === norm_(big));
 }
 
 function getFieldWorkBigName_(type) {
@@ -1002,10 +968,10 @@ function getFieldWorkBigName_(type) {
 
 function getAssignRelatedMids_(master, type) {
   const big = '案件確認';
-  const group = (master?.groups || []).find((g) => norm_(g.big) === big);
+  const group = (master?.groups || []).find(g => norm_(g.big) === big);
   if (!group) return ['アサイン'];
 
-  const exists = (name) => (group.mids || []).some((m) => norm_(m.mid) === norm_(name));
+  const exists = (name) => (group.mids || []).some(m => norm_(m.mid) === norm_(name));
   const out = [];
 
   if (exists('アサイン')) out.push('アサイン');
@@ -1015,10 +981,10 @@ function getAssignRelatedMids_(master, type) {
 }
 
 function getPreCloseMids_(master, type) {
-  const group = (master?.groups || []).find((g) => norm_(g.big) === '案件ステータス');
+  const group = (master?.groups || []).find(g => norm_(g.big) === '案件ステータス');
   if (!group) return [];
 
-  const names = (group.mids || []).map((m) => norm_(m.mid));
+  const names = (group.mids || []).map(m => norm_(m.mid));
   const out = [];
 
   if (names.includes('SE対応完了')) out.push('SE対応完了');
@@ -1030,10 +996,10 @@ function getPreCloseMids_(master, type) {
 }
 
 function getCloseMids_(master, type) {
-  const group = (master?.groups || []).find((g) => norm_(g.big) === '案件ステータス');
+  const group = (master?.groups || []).find(g => norm_(g.big) === '案件ステータス');
   if (!group) return [];
 
-  const names = (group.mids || []).map((m) => norm_(m.mid));
+  const names = (group.mids || []).map(m => norm_(m.mid));
   const out = [];
 
   if (names.includes('案件クローズ')) out.push('案件クローズ');
@@ -1056,7 +1022,7 @@ function getCommentCol_(hmS, type, big) {
     norm_(big) + '_コメント',
     norm_(big) + '_備考',
     norm_(big) + '_comment',
-    norm_(big) + '_Comment',
+    norm_(big) + '_Comment'
   ];
 
   for (let i = 0; i < candidates.length; i++) {
@@ -1105,9 +1071,9 @@ function api_getUnifiedCaseModal(req) {
       caseStatus: {
         statusMap: caseStatusRes.statusMap || {},
         naGroups: caseStatusRes.naGroups || {},
-        currentCode: caseStatusRes.currentCode || '',
+        currentCode: caseStatusRes.currentCode || ''
       },
-      input: inputRes.data || {},
+      input: inputRes.data || {}
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -1128,7 +1094,7 @@ function api_getUnifiedModalDetail(req) {
       ok: true,
       type,
       key,
-      detail: res.data || {},
+      detail: res.data || {}
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -1149,7 +1115,7 @@ function api_getUnifiedModalInput(req) {
       ok: true,
       type,
       key,
-      input: res.data || {},
+      input: res.data || {}
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -1171,14 +1137,14 @@ function api_saveUnifiedCaseModal(req) {
       key,
       current_status_code: statusReq.current_status_code || '',
       statusMap: statusReq.statusMap || {},
-      naBigs: Array.isArray(statusReq.naBigs) ? statusReq.naBigs : [],
+      naBigs: Array.isArray(statusReq.naBigs) ? statusReq.naBigs : []
     });
     if (!statusRes.ok) return { ok: false, error: statusRes.error || 'ステータス保存失敗' };
 
     const inputRes = api_upsertInput({
       type,
       key,
-      values: inputReq.values || {},
+      values: inputReq.values || {}
     });
     if (!inputRes.ok) return { ok: false, error: inputRes.error || '案件情報保存失敗' };
 
@@ -1210,7 +1176,12 @@ function findRowByKeyCached_(sheet, keyCol, key, startRow) {
 
   if (!sheet || !keyCol || !key) return 0;
 
-  const cacheKey = [sheet.getParent().getId(), sheet.getSheetId(), keyCol, startRow].join('::');
+  const cacheKey = [
+    sheet.getParent().getId(),
+    sheet.getSheetId(),
+    keyCol,
+    startRow
+  ].join('::');
 
   if (!__STATUS_EXEC_CACHE.rowIndex[cacheKey]) {
     __STATUS_EXEC_CACHE.rowIndex[cacheKey] = buildRowIndexMap_(sheet, keyCol, startRow);
@@ -1224,7 +1195,12 @@ function invalidateRowIndexCache_(sheet, keyCol, startRow) {
   if (!sheet || !keyCol) return;
   startRow = Number(startRow || 2);
 
-  const cacheKey = [sheet.getParent().getId(), sheet.getSheetId(), keyCol, startRow].join('::');
+  const cacheKey = [
+    sheet.getParent().getId(),
+    sheet.getSheetId(),
+    keyCol,
+    startRow
+  ].join('::');
 
   delete __STATUS_EXEC_CACHE.rowIndex[cacheKey];
 }

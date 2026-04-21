@@ -1,4 +1,4 @@
-const APP_TITLE = 'SOL推進基盤GrPortal';
+const APP_TITLE = 'SOL推進基盤GrPortal2';
 
 function doGet(e) {
   const p = e?.parameter || {};
@@ -32,9 +32,9 @@ function handleApiGet_(e) {
 }
 
 function json_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
-    ContentService.MimeType.JSON
-  );
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function handleApiPost_(e) {

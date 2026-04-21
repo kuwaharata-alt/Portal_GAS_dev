@@ -25,17 +25,7 @@ function getRulesSheet_() {
 function ensureHeader_() {
   const sh = getRulesSheet_();
   const header = sh.getRange(RULE_CONFIG.HEADER_ROW, 1, 1, 9).getValues()[0];
-  const expected = [
-    'ID',
-    'Category',
-    'Section',
-    'Content',
-    'Note',
-    'Sort',
-    'Enabled',
-    'UpdateBy',
-    'UpdateAt',
-  ];
+  const expected = ['ID', 'Category', 'Section', 'Content', 'Note', 'Sort', 'Enabled', 'UpdateBy', 'UpdateAt'];
   const ok = expected.every((v, i) => String(header[i] || '').trim() === v);
   if (!ok) throw new Error(`Header mismatch. Please set header row to: ${expected.join(', ')}`);
 }
@@ -46,18 +36,19 @@ function listRules_(filter) {
   const lastRow = sh.getLastRow();
   if (lastRow <= RULE_CONFIG.HEADER_ROW) return [];
 
-  const values = sh
-    .getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 9)
-    .getValues();
+  const values = sh.getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 9).getValues();
 
   const enabledFilter = (filter.enabled || '').toLowerCase();
-  const wantEnabled = enabledFilter === 'true' ? true : enabledFilter === 'false' ? false : null;
+  const wantEnabled =
+    enabledFilter === 'true' ? true :
+      enabledFilter === 'false' ? false :
+        null;
 
   const q = (filter.q || '').toLowerCase();
 
   return values
     .map(rowToObj_)
-    .filter((o) => {
+    .filter(o => {
       if (!o.ID) return false;
       if (filter.category && o.Category !== filter.category) return false;
       if (filter.section && o.Section !== filter.section) return false;
@@ -95,9 +86,7 @@ function upsertRules_(payload) {
   const lastRow = sh.getLastRow();
   const idToRow = new Map();
   if (lastRow > RULE_CONFIG.HEADER_ROW) {
-    const ids = sh
-      .getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 1)
-      .getValues();
+    const ids = sh.getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       const id = String(ids[i][0] || '').trim();
       if (id) idToRow.set(id, RULE_CONFIG.HEADER_ROW + 1 + i);
@@ -130,7 +119,7 @@ function upsertRules_(payload) {
 
     // Sort
     let sortToUse = o.Sort;
-    const isSortBlank = raw?.Sort === '' || raw?.Sort === null || raw?.Sort === undefined;
+    const isSortBlank = (raw?.Sort === '' || raw?.Sort === null || raw?.Sort === undefined);
 
     if (!exists) {
       if (isSortBlank || isNaN(Number(sortToUse))) {
@@ -177,9 +166,7 @@ function setEnabled_(id, enabled) {
   const lastRow = sh.getLastRow();
   if (lastRow <= RULE_CONFIG.HEADER_ROW) throw new Error('No data');
 
-  const ids = sh
-    .getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 1)
-    .getValues();
+  const ids = sh.getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 1).getValues();
   let rowNumber = null;
   for (let i = 0; i < ids.length; i++) {
     const cur = String(ids[i][0] || '').trim();
@@ -202,12 +189,13 @@ function setEnabled_(id, enabled) {
   const sortNo = rule ? Number(rule.Sort || 0) : 0;
 
   appendHistoryRow_(sortNo, 'Enabled', String(!enabled), String(enabled), user, nowIso);
+
 }
 
 function getMeta_() {
   const rows = listRules_({ enabled: '' });
-  const categories = [...new Set(rows.map((r) => r.Category).filter(Boolean))].sort();
-  const sections = [...new Set(rows.map((r) => r.Section).filter(Boolean))].sort();
+  const categories = [...new Set(rows.map(r => r.Category).filter(Boolean))].sort();
+  const sections = [...new Set(rows.map(r => r.Section).filter(Boolean))].sort();
   return { categories, sections };
 }
 
@@ -219,8 +207,7 @@ function getActiveEmail_() {
 
 function assertCanEdit_() {
   const email = getActiveEmail_();
-  if (!email)
-    throw new Error('Cannot detect user email. Deploy as domain/internal or require sign-in.');
+  if (!email) throw new Error('Cannot detect user email. Deploy as domain/internal or require sign-in.');
 
   const ss = getSs_();
   const sh = ss.getSheetByName(RULE_CONFIG.SHEET_ADMINS);
@@ -229,10 +216,8 @@ function assertCanEdit_() {
   const lastRow = sh.getLastRow();
   if (lastRow < 1) return true;
 
-  const values = sh
-    .getRange(1, 1, lastRow, 1)
-    .getValues()
-    .map((r) => String(r[0] || '').trim())
+  const values = sh.getRange(1, 1, lastRow, 1).getValues()
+    .map(r => String(r[0] || '').trim())
     .filter(Boolean);
 
   if (values.length === 0) return true;
@@ -244,7 +229,7 @@ function assertCanEdit_() {
 
 function normalizeInput_(raw) {
   const o = raw || {};
-  const sort = o.Sort === '' || o.Sort === null || o.Sort === undefined ? 0 : Number(o.Sort);
+  const sort = (o.Sort === '' || o.Sort === null || o.Sort === undefined) ? 0 : Number(o.Sort);
   return {
     ID: String(o.ID || '').trim(),
     Category: String(o.Category || '').trim(),
@@ -252,7 +237,7 @@ function normalizeInput_(raw) {
     Content: String(o.Content || '').trim(),
     Note: String(o.Note || '').trim(),
     Sort: isNaN(sort) ? 0 : sort,
-    Enabled: o.Enabled === '' || o.Enabled === null || o.Enabled === undefined ? true : !!o.Enabled,
+    Enabled: (o.Enabled === '' || o.Enabled === null || o.Enabled === undefined) ? true : !!o.Enabled,
   };
 }
 
@@ -264,7 +249,7 @@ function rowToObj_(r) {
     Content: String(r[3] || '').trim(),
     Note: String(r[4] || '').trim(),
     Sort: Number(r[5] || 0),
-    Enabled: String(r[6]).toLowerCase() === 'true' || r[6] === true,
+    Enabled: (String(r[6]).toLowerCase() === 'true') || r[6] === true,
     UpdateBy: String(r[7] || '').trim(),
     UpdateAt: String(r[8] || '').trim(),
   };
@@ -276,9 +261,7 @@ function getRuleRowById_(id) {
   const lastRow = sh.getLastRow();
   if (lastRow <= RULE_CONFIG.HEADER_ROW) return null;
 
-  const ids = sh
-    .getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 1)
-    .getValues();
+  const ids = sh.getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 1).getValues();
   for (let i = 0; i < ids.length; i++) {
     const cur = String(ids[i][0] || '').trim();
     if (cur === String(id || '').trim()) {
@@ -291,17 +274,7 @@ function getRuleRowById_(id) {
 }
 
 function objToRow_(o) {
-  return [
-    o.ID,
-    o.Category,
-    o.Section,
-    o.Content,
-    o.Note,
-    o.Sort,
-    o.Enabled,
-    o.UpdateBy,
-    o.UpdateAt,
-  ];
+  return [o.ID, o.Category, o.Section, o.Content, o.Note, o.Sort, o.Enabled, o.UpdateBy, o.UpdateAt];
 }
 
 function makeId_() {
@@ -316,9 +289,9 @@ function parseJsonBody_(e) {
 }
 
 function json_(obj, statusCode) {
-  return ContentService.createTextOutput(JSON.stringify(obj, null, 2)).setMimeType(
-    ContentService.MimeType.JSON
-  );
+  return ContentService
+    .createTextOutput(JSON.stringify(obj, null, 2))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 /** ===== UI (HtmlService) ===== */
@@ -361,9 +334,7 @@ function getNextSort_(category, section) {
   const lastRow = sh.getLastRow();
   if (lastRow <= RULE_CONFIG.HEADER_ROW) return 10;
 
-  const values = sh
-    .getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 6)
-    .getValues();
+  const values = sh.getRange(RULE_CONFIG.HEADER_ROW + 1, 1, lastRow - RULE_CONFIG.HEADER_ROW, 6).getValues();
 
   let maxSort = 0;
   for (const r of values) {
@@ -393,8 +364,7 @@ function ensureHistoryHeader_() {
   const header = sh.getRange(1, 1, 1, 7).getValues()[0];
   const expected = ['No', 'SortNo', '変更箇所', '旧内容', '新内容', '更新者', '更新日'];
   const ok = expected.every((v, i) => String(header[i] || '').trim() === v);
-  if (!ok)
-    throw new Error(`History header mismatch. Please set header row to: ${expected.join(', ')}`);
+  if (!ok) throw new Error(`History header mismatch. Please set header row to: ${expected.join(', ')}`);
 }
 
 function getNextHistoryNo_() {
@@ -403,7 +373,7 @@ function getNextHistoryNo_() {
   if (lastRow < 2) return 1;
   const lastNo = sh.getRange(lastRow, 1).getValue(); // A:No
   const n = Number(lastNo);
-  return (isNaN(n) ? lastRow - 1 : n) + 1;
+  return (isNaN(n) ? (lastRow - 1) : n) + 1;
 }
 
 /**
@@ -444,7 +414,7 @@ function listHistory_(limit = 200) {
   if (lastRow <= 1) return [];
 
   const rows = sh.getRange(2, 1, lastRow - 1, 7).getValues();
-  const out = rows.map((r) => ({
+  const out = rows.map(r => ({
     No: Number(r[0] || 0),
     SortNo: Number(r[1] || 0),
     変更箇所: String(r[2] || '').trim(),

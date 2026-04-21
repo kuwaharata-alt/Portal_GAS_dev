@@ -3,7 +3,7 @@
  *  ---------------------------------------------------- */
 
 function getSS_(key) {
-  const k = String(key ?? '').trim(); // ← 空白・null対策
+  const k = String(key ?? '').trim();   // ← 空白・null対策
 
   const map = {
     Display: '1f3Q0d3G4wEatiT_xK6hXKodoa52r5iDFG5q18iKHPFY', // Portal
@@ -38,14 +38,13 @@ function api_getMemberList() {
     const lastRow = sh.getLastRow();
     if (lastRow < 2) return { ok: true, list: [] };
 
-    const list = sh
-      .getRange(2, 7, lastRow - 1, 1)
-      .getDisplayValues()
+    const list = sh.getRange(2, 7, lastRow - 1, 1).getDisplayValues()
       .flat()
-      .map((v) => String(v || '').trim())
+      .map(v => String(v || '').trim())
       .filter(Boolean);
 
     return { ok: true, list: [...new Set(list)] };
+
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -59,17 +58,18 @@ function api_getMemberList() {
 function api_getLoginUser() {
   try {
     const email = Session.getActiveUser().getEmail() || '';
-    const name = email ? email.split('@')[0] : '';
+    const name  = email ? email.split('@')[0] : '';
 
     return {
       ok: true,
       email: email,
-      name: name,
+      name: name
     };
+
   } catch (err) {
     return {
       ok: false,
-      error: err.message,
+      error: err.message
     };
   }
 }
@@ -151,7 +151,7 @@ function api_getMenuAuth() {
 
     const ss = getSS_('Display');
 
-    const shAuth = ss.getSheetByName('タブ'); // ← 権限設定
+    const shAuth = ss.getSheetByName('タブ');        // ← 権限設定
     const shAccess = ss.getSheetByName('アクセス権'); // ← 1枚に統合
 
     if (!shAuth) throw new Error('タブシートがない');
@@ -164,7 +164,7 @@ function api_getMenuAuth() {
 
     const headers = accessValues[0];
     const colMap = {};
-    headers.forEach((h, i) => (colMap[h] = i));
+    headers.forEach((h, i) => colMap[h] = i);
 
     const idxMail = colMap['メールアドレス'];
     const idxAdmin = colMap['管理者'];
@@ -175,9 +175,7 @@ function api_getMenuAuth() {
 
     for (let i = 1; i < accessValues.length; i++) {
       const row = accessValues[i];
-      const mail = String(row[idxMail] || '')
-        .trim()
-        .toLowerCase();
+      const mail = String(row[idxMail] || '').trim().toLowerCase();
 
       if (mail !== email) continue;
 
@@ -193,7 +191,7 @@ function api_getMenuAuth() {
 
     const h = values[0];
     const map = {};
-    h.forEach((v, i) => (map[v] = i));
+    h.forEach((v, i) => map[v] = i);
 
     const allowedKeys = [];
 
@@ -209,10 +207,13 @@ function api_getMenuAuth() {
       const customRaw = row[map['カスタム列']];
       const customList = String(customRaw || '')
         .split(/[,\n、]/)
-        .map((v) => v.trim().toLowerCase())
+        .map(v => v.trim().toLowerCase())
         .filter(Boolean);
 
-      const allow = (adminFlag && isAdmin) || (userFlag && isUser) || customList.includes(email);
+      const allow =
+        (adminFlag && isAdmin) ||
+        (userFlag && isUser) ||
+        customList.includes(email);
 
       if (allow) allowedKeys.push(key);
     }
@@ -222,13 +223,14 @@ function api_getMenuAuth() {
       email,
       isAdmin,
       isUser,
-      allowedKeys,
+      allowedKeys
     };
+
   } catch (e) {
     return {
       ok: false,
       error: e.message,
-      allowedKeys: [],
+      allowedKeys: []
     };
   }
 }
@@ -250,13 +252,16 @@ function api_getPlanHolidayList() {
 
     const vals = sh.getRange(2, 2, lastRow - 1, 1).getValues();
 
-    const dates = vals.map((r) => toHolidayKey_(r[0])).filter(Boolean);
+    const dates = vals
+      .map(r => toHolidayKey_(r[0]))
+      .filter(Boolean);
 
     return { ok: true, dates };
+
   } catch (err) {
     return {
       ok: false,
-      error: err.message,
+      error: err.message
     };
   }
 }

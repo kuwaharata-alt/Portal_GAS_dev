@@ -1,383 +1,388 @@
 <script>
-  window.AppState = window.AppState || {};
+window.AppState = window.AppState || {};
 
-  window.AppState.type = window.AppState.type || 'SV';
-  window.AppState.headers = window.AppState.headers || [];
-  window.AppState.rows = window.AppState.rows || [];
-  window.AppState.total = Number(window.AppState.total || 0);
-  window.AppState.page = Number(window.AppState.page || 1);
-  window.AppState.pageSize = Number(window.AppState.pageSize || 500);
-  window.AppState.keyHeader = window.AppState.keyHeader || '見積番号';
-  window.AppState.customerHeader = window.AppState.customerHeader || '顧客名';
-  window.AppState.loginUser = window.AppState.loginUser || '';
-  window.AppState.filterMasterLoadedType = window.AppState.filterMasterLoadedType || '';
+window.AppState.type = window.AppState.type || 'SV';
+window.AppState.headers = window.AppState.headers || [];
+window.AppState.rows = window.AppState.rows || [];
+window.AppState.total = Number(window.AppState.total || 0);
+window.AppState.page = Number(window.AppState.page || 1);
+window.AppState.pageSize = Number(window.AppState.pageSize || 500);
+window.AppState.keyHeader = window.AppState.keyHeader || '見積番号';
+window.AppState.customerHeader = window.AppState.customerHeader || '顧客名';
+window.AppState.loginUser = window.AppState.loginUser || '';
+window.AppState.filterMasterLoadedType = window.AppState.filterMasterLoadedType || '';
 
-  window.AppState.filters = window.AppState.filters || {};
-  window.AppState.filters.members = Array.isArray(window.AppState.filters.members)
-    ? window.AppState.filters.members
-    : [];
-  window.AppState.filters.category = window.AppState.filters.category || '';
-  window.AppState.filters.statuses = Array.isArray(window.AppState.filters.statuses)
-    ? window.AppState.filters.statuses
-    : [];
+window.AppState.filters = window.AppState.filters || {};
+window.AppState.filters.members = Array.isArray(window.AppState.filters.members)
+  ? window.AppState.filters.members
+  : [];
+window.AppState.filters.category = window.AppState.filters.category || '';
+window.AppState.filters.statuses = Array.isArray(window.AppState.filters.statuses)
+  ? window.AppState.filters.statuses
+  : [];
 
-  async function ensureLoginUser_() {
-    const st = window.AppState;
-    if (st.loginUser) return;
 
-    return new Promise((resolve) => {
-      google.script.run
-        .withSuccessHandler(function (res) {
-          if (res && res.ok) {
-            st.loginUser = String(res.name || res.email || '').trim();
-          }
-          resolve();
-        })
-        .withFailureHandler(function () {
-          resolve();
-        })
-        .api_getLoginUser();
-    });
-  }
+async function ensureLoginUser_() {
+  const st = window.AppState;
+  if (st.loginUser) return;
 
-  async function ensureListFilterMaster_() {
-    const st = window.AppState;
-    if (st.filterMasterLoadedType === st.type) return;
-
-    return new Promise((resolve) => {
-      google.script.run
-        .withSuccessHandler(function (res) {
-          if (res && res.ok) {
-            buildMemberFilter_(res.members || []);
-            buildCategoryFilter_(res.categories || []);
-            buildStatusFilter_(res.statuses || []);
-            st.filterMasterLoadedType = st.type;
-          }
-          resolve();
-        })
-        .withFailureHandler(function () {
-          resolve();
-        })
-        .api_getListFilterMaster({ type: st.type });
-    });
-  }
-
-  async function loadCases_() {
-    const st = window.AppState;
-    const qEl = document.getElementById('q');
-    const q = qEl ? qEl.value : '';
-
-    await ensureLoginUser_();
-    await ensureListFilterMaster_();
-
-    setErrSafe_('');
-    setMetaSafe_('読込中...');
-
+  return new Promise((resolve) => {
     google.script.run
-      .withSuccessHandler(function (res) {
-        if (!res || !res.ok) {
-          setErrSafe_(res && res.error ? res.error : '取得失敗');
-          setMetaSafe_('');
-          return;
+      .withSuccessHandler(function(res){
+        if (res && res.ok) {
+          st.loginUser = String(res.name || res.email || '').trim();
         }
-
-        st.headers = Array.isArray(res.headers) ? res.headers : [];
-        st.rows = Array.isArray(res.rows) ? res.rows : [];
-        st.total = Number(res.total || 0);
-        st.page = Number(res.page || 1);
-        st.pageSize = Number(res.pageSize || 100);
-        st.keyHeader = res.keyHeader || '見積番号';
-        st.customerHeader = res.customerHeader || '顧客名';
-
-        const typeLabel = document.getElementById('listTypeLabel');
-        if (typeLabel) typeLabel.textContent = res.title || '一覧';
-
-        renderCases_(true);
-        setMetaSafe_('');
+        resolve();
       })
-      .withFailureHandler(function (err) {
-        setErrSafe_('api_list failure: ' + String(err));
-        setMetaSafe_('');
+      .withFailureHandler(function(){
+        resolve();
       })
-      .api_list({
-        type: st.type,
-        q: q,
-        members: st.filters.members,
-        category: st.filters.category,
-        statuses: st.filters.statuses,
-      });
-  }
+      .api_getLoginUser();
+  });
+}
 
-  function reloadList_() {
-    window.AppState.filterMasterLoadedType = '';
-    loadCases_();
-  }
+async function ensureListFilterMaster_() {
+  const st = window.AppState;
+  if (st.filterMasterLoadedType === st.type) return;
 
-  function buildHeader_() {
-    const st = window.AppState;
-    const thead = document.getElementById('thead');
-    if (!thead) return;
+  return new Promise((resolve) => {
+    google.script.run
+      .withSuccessHandler(function(res){
+        if (res && res.ok) {
+          buildMemberFilter_(res.members || []);
+          buildCategoryFilter_(res.categories || []);
+          buildStatusFilter_(res.statuses || []);
+          st.filterMasterLoadedType = st.type;
+        }
+        resolve();
+      })
+      .withFailureHandler(function(){
+        resolve();
+      })
+      .api_getListFilterMaster({ type: st.type });
+  });
+}
 
-    thead.innerHTML = '';
+async function loadCases_(){
+  const st = window.AppState;
+  const qEl = document.getElementById('q');
+  const q = qEl ? qEl.value : '';
 
-    const thAct = document.createElement('th');
-    thAct.textContent = '操作';
-    thAct.className = 'col-act';
-    thead.appendChild(thAct);
+  await ensureLoginUser_();
+  await ensureListFilterMaster_();
 
-    st.headers.forEach(function (h) {
-      const th = document.createElement('th');
-      th.textContent = h || '';
-      thead.appendChild(th);
+  setErrSafe_('');
+  setMetaSafe_('読込中...');
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok) {
+        setErrSafe_(res && res.error ? res.error : '取得失敗');
+        setMetaSafe_('');
+        return;
+      }
+
+      st.headers = Array.isArray(res.headers) ? res.headers : [];
+      st.rows = Array.isArray(res.rows) ? res.rows : [];
+      st.total = Number(res.total || 0);
+      st.page = Number(res.page || 1);
+      st.pageSize = Number(res.pageSize || 100);
+      st.keyHeader = res.keyHeader || '見積番号';
+      st.customerHeader = res.customerHeader || '顧客名';
+
+      const typeLabel = document.getElementById('listTypeLabel');
+      if (typeLabel) typeLabel.textContent = res.title || '一覧';
+
+      renderCases_(true);
+      setMetaSafe_('');
+    })
+    .withFailureHandler(function(err){
+      setErrSafe_('api_list failure: ' + String(err));
+      setMetaSafe_('');
+    })
+    .api_list({
+      type: st.type,
+      q: q,
+      members: st.filters.members,
+      category: st.filters.category,
+      statuses: st.filters.statuses
     });
+}
+
+function reloadList_(){
+  window.AppState.filterMasterLoadedType = '';
+  loadCases_();
+}
+
+function buildHeader_(){
+  const st = window.AppState;
+  const thead = document.getElementById('thead');
+  if (!thead) return;
+
+  thead.innerHTML = '';
+
+  const thAct = document.createElement('th');
+  thAct.textContent = '操作';
+  thAct.className = 'col-act';
+  thead.appendChild(thAct);
+
+  st.headers.forEach(function(h){
+    const th = document.createElement('th');
+    th.textContent = h || '';
+    thead.appendChild(th);
+  });
+}
+
+function renderCases_(rebuildHeader){
+  const st = window.AppState;
+  const tbody = document.getElementById('tbody');
+  const countEl = document.getElementById('count');
+
+  if (!tbody) return;
+  if (rebuildHeader) buildHeader_();
+
+  tbody.innerHTML = '';
+
+  if (!st.rows.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = (st.headers.length || 0) + 1;
+    td.textContent = '表示対象がありません';
+    td.className = 'small';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    if (countEl) countEl.textContent = '表示 0件';
+    return;
   }
 
-  function renderCases_(rebuildHeader) {
-    const st = window.AppState;
-    const tbody = document.getElementById('tbody');
-    const countEl = document.getElementById('count');
+  st.rows.forEach(function(item){
+    const tr = document.createElement('tr');
+    const row = item.cells || [];
 
-    if (!tbody) return;
-    if (rebuildHeader) buildHeader_();
+    if (isMyCase_(item)) {
+      tr.classList.add('is-mine');
+    }
 
-    tbody.innerHTML = '';
+    const tdAct = document.createElement('td');
+    tdAct.className = 'col-act';
 
-    if (!st.rows.length) {
-      const tr = document.createElement('tr');
+    const btnView = document.createElement('button');
+    btnView.type = 'button';
+    btnView.textContent = 'Edit';
+    btnView.className = 'list-act-btn';
+    btnView.onclick = function(){
+      alert('今後実装します');
+    };
+
+    tdAct.appendChild(btnView);
+    tr.appendChild(tdAct);
+
+    for (let i = 0; i < st.headers.length; i++) {
       const td = document.createElement('td');
-      td.colSpan = (st.headers.length || 0) + 1;
-      td.textContent = '表示対象がありません';
-      td.className = 'small';
+      td.innerHTML = row[i] == null ? '' : String(row[i]);
+
+      const h = st.headers[i];
+      if (h === 'ステータス') td.classList.add('status-cell');
+      if (h === '案件概要') td.classList.add('td-case-summary');
+      if (h === '案件情報') td.classList.add('td-case-info');
+      if (h === '担当SE') td.classList.add('td-case-se');
+      if (h === '作業期間') td.classList.add('td-work-period');
+      if (h === '備考') td.classList.add('td-remarks');
+
       tr.appendChild(td);
-      tbody.appendChild(tr);
-      if (countEl) countEl.textContent = '表示 0件';
-      return;
     }
 
-    st.rows.forEach(function (item) {
-      const tr = document.createElement('tr');
-      const row = item.cells || [];
-
-      if (isMyCase_(item)) {
-        tr.classList.add('is-mine');
-      }
-
-      const tdAct = document.createElement('td');
-      tdAct.className = 'col-act';
-
-      const btnView = document.createElement('button');
-      btnView.type = 'button';
-      btnView.textContent = 'Edit';
-      btnView.className = 'list-act-btn';
-      btnView.onclick = function () {
-        alert('今後実装します');
-      };
-
-      tdAct.appendChild(btnView);
-      tr.appendChild(tdAct);
-
-      for (let i = 0; i < st.headers.length; i++) {
-        const td = document.createElement('td');
-        td.innerHTML = row[i] == null ? '' : String(row[i]);
-
-        const h = st.headers[i];
-        if (h === 'ステータス') td.classList.add('status-cell');
-        if (h === '案件概要') td.classList.add('td-case-summary');
-        if (h === '案件情報') td.classList.add('td-case-info');
-        if (h === '担当SE') td.classList.add('td-case-se');
-        if (h === '作業期間') td.classList.add('td-work-period');
-        if (h === '備考') td.classList.add('td-remarks');
-
-        tr.appendChild(td);
-      }
-
-      tbody.appendChild(tr);
-    });
-
-    if (countEl) {
-      countEl.textContent = st.total === 0 ? '表示 0件' : `表示 ${st.total}件 / 全${st.total}件`;
-    }
-  }
-
-  function isMyCase_(item) {
-    const me = String(window.AppState.loginUser || '').trim();
-    if (!me) return false;
-
-    const members = Array.isArray(item.memberNames) ? item.memberNames : [];
-    return members.includes(me);
-  }
-
-  /* =========================
-   * 担当者フィルタ（複数）
-   * ======================= */
-  function buildMemberFilter_(members) {
-    const menu = document.getElementById('memberMenu');
-    if (!menu) return;
-
-    const selected = new Set(window.AppState.filters.members || []);
-    menu.innerHTML = '';
-
-    members.forEach((name) => {
-      const label = document.createElement('label');
-      label.className = 'dd-item';
-
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = name;
-      cb.checked = selected.has(name);
-      cb.onchange = onMemberFilterChanged_;
-
-      const sp = document.createElement('span');
-      sp.textContent = name;
-
-      label.appendChild(cb);
-      label.appendChild(sp);
-      menu.appendChild(label);
-    });
-
-    updateMemberFilterLabel_();
-  }
-
-  function onMemberFilterChanged_() {
-    const checked = Array.from(
-      document.querySelectorAll('#memberMenu input[type="checkbox"]:checked')
-    ).map((el) => el.value);
-
-    window.AppState.filters.members = checked;
-    updateMemberFilterLabel_();
-    loadCases_();
-  }
-
-  function updateMemberFilterLabel_() {
-    const btn = document.getElementById('memberBtn');
-    if (!btn) return;
-
-    const members = window.AppState.filters.members || [];
-    if (!members.length) {
-      btn.textContent = '全員';
-      return;
-    }
-
-    btn.textContent =
-      members.length === 1 ? `担当者: ${members[0]}` : `担当者: ${members.length}名選択`;
-  }
-
-  function toggleMemberDD_(ev) {
-    ev && ev.stopPropagation && ev.stopPropagation();
-    const dd = document.getElementById('memberDD');
-    if (!dd) return;
-    dd.classList.toggle('is-open');
-  }
-
-  /* =========================
-   * カテゴリフィルタ
-   * ======================= */
-  function buildCategoryFilter_(categories) {
-    const sel = document.getElementById('categoryFilter');
-    if (!sel) return;
-
-    const current = window.AppState.filters.category || '';
-    sel.innerHTML = '<option value="">すべて</option>';
-
-    categories.forEach((cat) => {
-      const opt = document.createElement('option');
-      opt.value = cat;
-      opt.textContent = cat;
-      sel.appendChild(opt);
-    });
-
-    sel.value = current;
-  }
-
-  function onListFilterChanged_() {
-    const sel = document.getElementById('categoryFilter');
-    window.AppState.filters.category = sel ? sel.value : '';
-    loadCases_();
-  }
-
-  /* =========================
-   * ステータスフィルタ
-   * ======================= */
-
-  function buildStatusFilter_(statuses) {
-    const menu = document.getElementById('statusMenu');
-    if (!menu) return;
-
-    const selected = new Set(window.AppState.filters.statuses || []);
-    menu.innerHTML = '';
-
-    statuses.forEach((status) => {
-      const label = document.createElement('label');
-      label.className = 'dd-item';
-
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = status;
-      cb.checked = selected.has(status);
-      cb.onchange = onStatusFilterChanged_;
-
-      const sp = document.createElement('span');
-      sp.textContent = status;
-
-      label.appendChild(cb);
-      label.appendChild(sp);
-      menu.appendChild(label);
-    });
-
-    updateStatusFilterLabel_();
-  }
-
-  function onStatusFilterChanged_() {
-    const checked = Array.from(
-      document.querySelectorAll('#statusMenu input[type="checkbox"]:checked')
-    ).map((el) => el.value);
-
-    window.AppState.filters.statuses = checked;
-    updateStatusFilterLabel_();
-    loadCases_();
-  }
-
-  function updateStatusFilterLabel_() {
-    const btn = document.getElementById('statusBtn');
-    if (!btn) return;
-
-    const statuses = window.AppState.filters.statuses || [];
-    if (!statuses.length) {
-      btn.textContent = 'すべて';
-      return;
-    }
-
-    btn.textContent = statuses.length === 1 ? statuses[0] : `ステータス: ${statuses.length}件選択`;
-  }
-
-  function toggleStatusDD_(ev) {
-    ev && ev.stopPropagation && ev.stopPropagation();
-    const dd = document.getElementById('statusDD');
-    if (!dd) return;
-    dd.classList.toggle('is-open');
-  }
-
-  /* =========================
-   * common
-   * ======================= */
-  function setMetaSafe_(msg) {
-    if (typeof setMeta === 'function') return setMeta(msg);
-    const el = document.getElementById('meta');
-    if (el) el.textContent = String(msg || '');
-  }
-
-  function setErrSafe_(msg) {
-    if (typeof setErr === 'function') return setErr(msg);
-    const el = document.getElementById('meta');
-    if (el) el.textContent = String(msg || '');
-  }
-
-  document.addEventListener('click', function () {
-    document.getElementById('memberDD')?.classList.remove('is-open');
-    document.getElementById('statusDD')?.classList.remove('is-open');
+    tbody.appendChild(tr);
   });
 
-  window.renderCases_ = renderCases_;
-  window.loadCases_ = loadCases_;
-  window.reloadList_ = reloadList_;
+  if (countEl) {
+    countEl.textContent = st.total === 0
+      ? '表示 0件'
+      : `表示 ${st.total}件 / 全${st.total}件`;
+  }
+}
+
+function isMyCase_(item){
+  const me = String(window.AppState.loginUser || '').trim();
+  if (!me) return false;
+
+  const members = Array.isArray(item.memberNames) ? item.memberNames : [];
+  return members.includes(me);
+}
+
+/* =========================
+ * 担当者フィルタ（複数）
+ * ======================= */
+function buildMemberFilter_(members){
+  const menu = document.getElementById('memberMenu');
+  if (!menu) return;
+
+  const selected = new Set(window.AppState.filters.members || []);
+  menu.innerHTML = '';
+
+  members.forEach(name => {
+    const label = document.createElement('label');
+    label.className = 'dd-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = name;
+    cb.checked = selected.has(name);
+    cb.onchange = onMemberFilterChanged_;
+
+    const sp = document.createElement('span');
+    sp.textContent = name;
+
+    label.appendChild(cb);
+    label.appendChild(sp);
+    menu.appendChild(label);
+  });
+
+  updateMemberFilterLabel_();
+}
+
+function onMemberFilterChanged_(){
+  const checked = Array.from(document.querySelectorAll('#memberMenu input[type="checkbox"]:checked'))
+    .map(el => el.value);
+
+  window.AppState.filters.members = checked;
+  updateMemberFilterLabel_();
+  loadCases_();
+}
+
+function updateMemberFilterLabel_(){
+  const btn = document.getElementById('memberBtn');
+  if (!btn) return;
+
+  const members = window.AppState.filters.members || [];
+  if (!members.length) {
+    btn.textContent = '全員';
+    return;
+  }
+
+  btn.textContent = members.length === 1
+    ? `担当者: ${members[0]}`
+    : `担当者: ${members.length}名選択`;
+}
+
+function toggleMemberDD_(ev){
+  ev && ev.stopPropagation && ev.stopPropagation();
+  const dd = document.getElementById('memberDD');
+  if (!dd) return;
+  dd.classList.toggle('is-open');
+}
+
+/* =========================
+ * カテゴリフィルタ
+ * ======================= */
+function buildCategoryFilter_(categories){
+  const sel = document.getElementById('categoryFilter');
+  if (!sel) return;
+
+  const current = window.AppState.filters.category || '';
+  sel.innerHTML = '<option value="">すべて</option>';
+
+  categories.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    sel.appendChild(opt);
+  });
+
+  sel.value = current;
+}
+
+function onListFilterChanged_(){
+  const sel = document.getElementById('categoryFilter');
+  window.AppState.filters.category = sel ? sel.value : '';
+  loadCases_();
+}
+
+/* =========================
+ * ステータスフィルタ
+ * ======================= */
+
+function buildStatusFilter_(statuses){
+  const menu = document.getElementById('statusMenu');
+  if (!menu) return;
+
+  const selected = new Set(window.AppState.filters.statuses || []);
+  menu.innerHTML = '';
+
+  statuses.forEach(status => {
+    const label = document.createElement('label');
+    label.className = 'dd-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = status;
+    cb.checked = selected.has(status);
+    cb.onchange = onStatusFilterChanged_;
+
+    const sp = document.createElement('span');
+    sp.textContent = status;
+
+    label.appendChild(cb);
+    label.appendChild(sp);
+    menu.appendChild(label);
+  });
+
+  updateStatusFilterLabel_();
+}
+
+function onStatusFilterChanged_(){
+  const checked = Array.from(document.querySelectorAll('#statusMenu input[type="checkbox"]:checked'))
+    .map(el => el.value);
+
+  window.AppState.filters.statuses = checked;
+  updateStatusFilterLabel_();
+  loadCases_();
+}
+
+function updateStatusFilterLabel_(){
+  const btn = document.getElementById('statusBtn');
+  if (!btn) return;
+
+  const statuses = window.AppState.filters.statuses || [];
+  if (!statuses.length) {
+    btn.textContent = 'すべて';
+    return;
+  }
+
+  btn.textContent = statuses.length === 1
+    ? statuses[0]
+    : `ステータス: ${statuses.length}件選択`;
+}
+
+function toggleStatusDD_(ev){
+  ev && ev.stopPropagation && ev.stopPropagation();
+  const dd = document.getElementById('statusDD');
+  if (!dd) return;
+  dd.classList.toggle('is-open');
+}
+
+
+/* =========================
+ * common
+ * ======================= */
+function setMetaSafe_(msg){
+  if (typeof setMeta === 'function') return setMeta(msg);
+  const el = document.getElementById('meta');
+  if (el) el.textContent = String(msg || '');
+}
+
+function setErrSafe_(msg){
+  if (typeof setErr === 'function') return setErr(msg);
+  const el = document.getElementById('meta');
+  if (el) el.textContent = String(msg || '');
+}
+
+document.addEventListener('click', function(){
+  document.getElementById('memberDD')?.classList.remove('is-open');
+  document.getElementById('statusDD')?.classList.remove('is-open');
+});
+
+window.renderCases_ = renderCases_;
+window.loadCases_ = loadCases_;
+window.reloadList_ = reloadList_;
 </script>

@@ -29,8 +29,9 @@ const PLAN_APP = {
     pmLocation: 'PM_勤務場所',
     pmVacation: 'PM_休暇',
     pmCustomer: 'PM_対応顧客名',
-  },
+  }
 };
+
 
 /** ======================================================================
  *  マスタ取得
@@ -53,18 +54,16 @@ function api_getPlanMaster() {
   // Settings側：メンバーとグループ
   const settingsMembers = [];
   if (settingsLastRow > PLAN_APP.HEADER_ROW) {
-    const vals = shSettings
-      .getRange(
-        PLAN_APP.HEADER_ROW + 1,
-        1,
-        settingsLastRow - PLAN_APP.HEADER_ROW,
-        shSettings.getLastColumn()
-      )
-      .getValues();
+    const vals = shSettings.getRange(
+      PLAN_APP.HEADER_ROW + 1,
+      1,
+      settingsLastRow - PLAN_APP.HEADER_ROW,
+      shSettings.getLastColumn()
+    ).getValues();
 
     vals.forEach((r, idx) => {
       const member = normalizeText_(r[hmSettings[PLAN_APP.SETTINGS_HEADERS.member] - 1]);
-      const group = normalizeText_(r[hmSettings[PLAN_APP.SETTINGS_HEADERS.group] - 1]);
+      const group  = normalizeText_(r[hmSettings[PLAN_APP.SETTINGS_HEADERS.group] - 1]);
 
       if (member) {
         settingsMembers.push({
@@ -79,20 +78,18 @@ function api_getPlanMaster() {
   // マスタ側：ステータス・勤務場所・休暇・メンバー名
   const masterMemberSet = new Set();
   if (masterLastRow > PLAN_APP.HEADER_ROW) {
-    const vals = shMaster
-      .getRange(
-        PLAN_APP.HEADER_ROW + 1,
-        1,
-        masterLastRow - PLAN_APP.HEADER_ROW,
-        shMaster.getLastColumn()
-      )
-      .getValues();
+    const vals = shMaster.getRange(
+      PLAN_APP.HEADER_ROW + 1,
+      1,
+      masterLastRow - PLAN_APP.HEADER_ROW,
+      shMaster.getLastColumn()
+    ).getValues();
 
-    vals.forEach((r) => {
-      const status = normalizeText_(r[hmMaster[PLAN_APP.MASTER_HEADERS.status] - 1]);
+    vals.forEach(r => {
+      const status   = normalizeText_(r[hmMaster[PLAN_APP.MASTER_HEADERS.status] - 1]);
       const location = normalizeText_(r[hmMaster[PLAN_APP.MASTER_HEADERS.location] - 1]);
       const vacation = normalizeText_(r[hmMaster[PLAN_APP.MASTER_HEADERS.vacation] - 1]);
-      const member = normalizeText_(r[hmMaster[PLAN_APP.MASTER_HEADERS.member] - 1]);
+      const member   = normalizeText_(r[hmMaster[PLAN_APP.MASTER_HEADERS.member] - 1]);
 
       if (status) statusSet.add(status);
       if (location) locationSet.add(location);
@@ -103,12 +100,12 @@ function api_getPlanMaster() {
 
   // Settingsを優先してメンバー一覧を作る
   const memberMap = new Map();
-  settingsMembers.forEach((x) => {
+  settingsMembers.forEach(x => {
     memberMap.set(x.name, x);
   });
 
   // マスタにしかいないメンバーも補完
-  Array.from(masterMemberSet).forEach((name) => {
+  Array.from(masterMemberSet).forEach(name => {
     if (!memberMap.has(name)) {
       memberMap.set(name, {
         name,
@@ -118,11 +115,12 @@ function api_getPlanMaster() {
     }
   });
 
-  const uniqMembers = Array.from(memberMap.values()).sort((a, b) => a.order - b.order);
+  const uniqMembers = Array.from(memberMap.values())
+    .sort((a, b) => a.order - b.order);
 
   return {
     ok: true,
-    members: uniqMembers.map((x) => x.name),
+    members: uniqMembers.map(x => x.name),
     memberGroups: uniqMembers,
     statusList: Array.from(statusSet),
     locationList: Array.from(locationSet),
@@ -146,7 +144,7 @@ function api_getMemberMonthPlan(memberName, baseYm, months) {
   const mapByDate = {};
   if (lastRow > 1) {
     const vals = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-    vals.forEach((r) => {
+    vals.forEach(r => {
       const key = normalizePlanDateKey_(r[hm[needHeaders.date] - 1]);
       if (!key) return;
 
@@ -175,7 +173,7 @@ function api_getMemberMonthPlan(memberName, baseYm, months) {
     });
   }
 
-  dates.forEach((d) => {
+  dates.forEach(d => {
     const key = normalizePlanDateKey_(d);
     data.push(
       mapByDate[key] || {
@@ -238,11 +236,11 @@ function normalizePlanDateKey_(v) {
 
 function isMeaningfulPlanRow_(obj) {
   return !!(
-    String(obj.amStatus || '').trim() ||
+    String(obj.amStatus   || '').trim() ||
     String(obj.amLocation || '').trim() ||
     String(obj.amVacation || '').trim() ||
     String(obj.amCustomer || '').trim() ||
-    String(obj.pmStatus || '').trim() ||
+    String(obj.pmStatus   || '').trim() ||
     String(obj.pmLocation || '').trim() ||
     String(obj.pmVacation || '').trim() ||
     String(obj.pmCustomer || '').trim()
@@ -261,29 +259,25 @@ function setCellIfPresent_(sh, row, col, obj, key) {
 
 function getExistingEventIds_(sh, row, hm) {
   return {
-    amEventId: String(
-      (hm['AM_eventId'] ? sh.getRange(row, hm['AM_eventId']).getValue() : '') || ''
-    ).trim(),
-    pmEventId: String(
-      (hm['PM_eventId'] ? sh.getRange(row, hm['PM_eventId']).getValue() : '') || ''
-    ).trim(),
+    amEventId: String((hm['AM_eventId'] ? sh.getRange(row, hm['AM_eventId']).getValue() : '') || '').trim(),
+    pmEventId: String((hm['PM_eventId'] ? sh.getRange(row, hm['PM_eventId']).getValue() : '') || '').trim(),
   };
 }
 
 function readPlanRowCurrentValues_(sh, row, hm) {
   return {
-    date: hm['日付'] ? sh.getRange(row, hm['日付']).getDisplayValue() : '',
-    week: hm['曜日'] ? sh.getRange(row, hm['曜日']).getDisplayValue() : '',
+    date:       hm['日付']         ? sh.getRange(row, hm['日付']).getDisplayValue() : '',
+    week:       hm['曜日']         ? sh.getRange(row, hm['曜日']).getDisplayValue() : '',
 
-    amStatus: hm['AM_ステータス'] ? sh.getRange(row, hm['AM_ステータス']).getDisplayValue() : '',
-    amLocation: hm['AM_勤務場所'] ? sh.getRange(row, hm['AM_勤務場所']).getDisplayValue() : '',
-    amVacation: hm['AM_休暇'] ? sh.getRange(row, hm['AM_休暇']).getDisplayValue() : '',
-    amCustomer: hm['AM_対応顧客名'] ? sh.getRange(row, hm['AM_対応顧客名']).getDisplayValue() : '',
+    amStatus:   hm['AM_ステータス']   ? sh.getRange(row, hm['AM_ステータス']).getDisplayValue() : '',
+    amLocation: hm['AM_勤務場所']     ? sh.getRange(row, hm['AM_勤務場所']).getDisplayValue() : '',
+    amVacation: hm['AM_休暇']         ? sh.getRange(row, hm['AM_休暇']).getDisplayValue() : '',
+    amCustomer: hm['AM_対応顧客名']   ? sh.getRange(row, hm['AM_対応顧客名']).getDisplayValue() : '',
 
-    pmStatus: hm['PM_ステータス'] ? sh.getRange(row, hm['PM_ステータス']).getDisplayValue() : '',
-    pmLocation: hm['PM_勤務場所'] ? sh.getRange(row, hm['PM_勤務場所']).getDisplayValue() : '',
-    pmVacation: hm['PM_休暇'] ? sh.getRange(row, hm['PM_休暇']).getDisplayValue() : '',
-    pmCustomer: hm['PM_対応顧客名'] ? sh.getRange(row, hm['PM_対応顧客名']).getDisplayValue() : '',
+    pmStatus:   hm['PM_ステータス']   ? sh.getRange(row, hm['PM_ステータス']).getDisplayValue() : '',
+    pmLocation: hm['PM_勤務場所']     ? sh.getRange(row, hm['PM_勤務場所']).getDisplayValue() : '',
+    pmVacation: hm['PM_休暇']         ? sh.getRange(row, hm['PM_休暇']).getDisplayValue() : '',
+    pmCustomer: hm['PM_対応顧客名']   ? sh.getRange(row, hm['PM_対応顧客名']).getDisplayValue() : '',
   };
 }
 
@@ -308,22 +302,21 @@ function mergePlanRowForSave_(current, incoming) {
       : normalizePlanDateKey_(current.date),
 
     week: hasOwn_(incoming, 'week')
-      ? incoming.week === undefined || incoming.week === ''
-        ? current.week || ''
-        : String(incoming.week).trim()
-      : current.week || '',
+      ? (incoming.week === undefined || incoming.week === '' ? (current.week || '') : String(incoming.week).trim())
+      : (current.week || ''),
 
-    amStatus: pickMergedPlanValue_(incoming, 'amStatus', current.amStatus),
+    amStatus:   pickMergedPlanValue_(incoming, 'amStatus',   current.amStatus),
     amLocation: pickMergedPlanValue_(incoming, 'amLocation', current.amLocation),
     amVacation: pickMergedPlanValue_(incoming, 'amVacation', current.amVacation),
     amCustomer: pickMergedPlanValue_(incoming, 'amCustomer', current.amCustomer),
 
-    pmStatus: pickMergedPlanValue_(incoming, 'pmStatus', current.pmStatus),
+    pmStatus:   pickMergedPlanValue_(incoming, 'pmStatus',   current.pmStatus),
     pmLocation: pickMergedPlanValue_(incoming, 'pmLocation', current.pmLocation),
     pmVacation: pickMergedPlanValue_(incoming, 'pmVacation', current.pmVacation),
     pmCustomer: pickMergedPlanValue_(incoming, 'pmCustomer', current.pmCustomer),
   };
 }
+
 
 /** ======================================================================
  *   個人シートの保存
@@ -340,26 +333,14 @@ function api_saveMemberMonthPlan(payload) {
   const hm = getHeaderMap_(sh, 1);
 
   const required = [
-    '日付',
-    '曜日',
-    '所定休日',
-    'AM_ステータス',
-    'AM_勤務場所',
-    'AM_休暇',
-    'AM_対応顧客名',
-    'AM_eventId',
-    'AM_syncStatus',
-    'AM_syncAt',
-    'PM_ステータス',
-    'PM_勤務場所',
-    'PM_休暇',
-    'PM_対応顧客名',
-    'PM_eventId',
-    'PM_syncStatus',
-    'PM_syncAt',
+    '日付','曜日','所定休日',
+    'AM_ステータス','AM_勤務場所','AM_休暇','AM_対応顧客名',
+    'AM_eventId','AM_syncStatus','AM_syncAt',
+    'PM_ステータス','PM_勤務場所','PM_休暇','PM_対応顧客名',
+    'PM_eventId','PM_syncStatus','PM_syncAt'
   ];
 
-  required.forEach((h) => {
+  required.forEach(h => {
     if (!hm[h]) throw new Error('個人シートのヘッダー不足: ' + h);
   });
 
@@ -376,7 +357,7 @@ function api_saveMemberMonthPlan(payload) {
 
   const syncSourceRows = [];
 
-  rows.forEach((obj) => {
+  rows.forEach(obj => {
     if (!isMeaningfulPlanRow_(obj)) return;
 
     const key = normalizePlanDateKey_(obj.date);
@@ -434,8 +415,9 @@ function api_saveMemberMonthPlan(payload) {
     });
   });
 
+
   // 予定管理表は、保存後の実値で反映
-  const summaryRows = syncSourceRows.map((r) => ({
+  const summaryRows = syncSourceRows.map(r => ({
     date: normalizePlanDateKey_(r.date),
     week: r.week || '',
     amStatus: r.amStatus || '',
@@ -482,9 +464,7 @@ function upsertMemberToSummaryFast_(memberName, rows) {
   const dateMap = {};
 
   if (lastRow >= DATA_START_ROW) {
-    bodyValues = sh
-      .getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, Math.max(memberCol, 2))
-      .getValues();
+    bodyValues = sh.getRange(DATA_START_ROW, 1, lastRow - DATA_START_ROW + 1, Math.max(memberCol, 2)).getValues();
     bodyValues.forEach((r, i) => {
       const key = normalizePlanDateKey_(r[0]);
       if (key) dateMap[key] = i;
@@ -493,7 +473,7 @@ function upsertMemberToSummaryFast_(memberName, rows) {
 
   const appendRows = [];
 
-  rows.forEach((r) => {
+  rows.forEach(r => {
     const dateKey = normalizePlanDateKey_(r.date);
     if (!dateKey) return;
 
@@ -524,7 +504,7 @@ function upsertMemberToSummaryFast_(memberName, rows) {
 
   if (bodyValues.length) {
     const width = Math.max(memberCol, 2);
-    const normalized = bodyValues.map((r) => {
+    const normalized = bodyValues.map(r => {
       const row = r.slice();
       while (row.length < width) row.push('');
       row[0] = normalizePlanDateKey_(row[0]);
@@ -535,15 +515,13 @@ function upsertMemberToSummaryFast_(memberName, rows) {
 
   if (appendRows.length) {
     const width = Math.max(memberCol, 2);
-    const normalizedAppend = appendRows.map((r) => {
+    const normalizedAppend = appendRows.map(r => {
       const row = r.slice();
       while (row.length < width) row.push('');
       row[0] = normalizePlanDateKey_(row[0]);
       return row;
     });
-    sh.getRange(DATA_START_ROW + bodyValues.length, 1, normalizedAppend.length, width).setValues(
-      normalizedAppend
-    );
+    sh.getRange(DATA_START_ROW + bodyValues.length, 1, normalizedAppend.length, width).setValues(normalizedAppend);
   }
 
   const finalLastRow = sh.getLastRow();
@@ -566,28 +544,20 @@ function api_saveMemberMonthPlanFast(payload) {
     const hm = getHeaderMap_(sh, 1);
 
     const required = [
-      '日付',
-      '曜日',
-      '所定休日',
-      'AM_ステータス',
-      'AM_勤務場所',
-      'AM_休暇',
-      'AM_対応顧客名',
-      'PM_ステータス',
-      'PM_勤務場所',
-      'PM_休暇',
-      'PM_対応顧客名',
+      '日付','曜日','所定休日',
+      'AM_ステータス','AM_勤務場所','AM_休暇','AM_対応顧客名',
+      'PM_ステータス','PM_勤務場所','PM_休暇','PM_対応顧客名'
     ];
-    required.forEach((h) => {
+    required.forEach(h => {
       if (!hm[h]) throw new Error('個人シートのヘッダー不足: ' + h);
     });
 
     const targetRows = rows
-      .map((r) => ({
+      .map(r => ({
         ...r,
         date: normalizePlanDateKey_(r.date),
       }))
-      .filter((r) => r.date && isMeaningfulPlanRow_(r));
+      .filter(r => r.date && isMeaningfulPlanRow_(r));
 
     if (!targetRows.length) {
       return { ok: true, skipped: true };
@@ -610,7 +580,7 @@ function api_saveMemberMonthPlanFast(payload) {
     const appendRows = [];
     const summaryRows = [];
 
-    targetRows.forEach((obj) => {
+    targetRows.forEach(obj => {
       const key = obj.date;
       const week = String(obj.week || '').trim();
 
@@ -634,32 +604,24 @@ function api_saveMemberMonthPlanFast(payload) {
       currentRow[hm['日付'] - 1] = normalizePlanDateKey_(currentRow[hm['日付'] - 1] || key);
       if (!currentRow[hm['曜日'] - 1]) currentRow[hm['曜日'] - 1] = week;
 
-      if (obj.amStatus !== undefined && obj.amStatus !== '')
-        currentRow[hm['AM_ステータス'] - 1] = obj.amStatus;
-      if (obj.amLocation !== undefined && obj.amLocation !== '')
-        currentRow[hm['AM_勤務場所'] - 1] = obj.amLocation;
-      if (obj.amVacation !== undefined && obj.amVacation !== '')
-        currentRow[hm['AM_休暇'] - 1] = obj.amVacation;
-      if (obj.amCustomer !== undefined && obj.amCustomer !== '')
-        currentRow[hm['AM_対応顧客名'] - 1] = obj.amCustomer;
+      if (obj.amStatus   !== undefined && obj.amStatus   !== '') currentRow[hm['AM_ステータス'] - 1] = obj.amStatus;
+      if (obj.amLocation !== undefined && obj.amLocation !== '') currentRow[hm['AM_勤務場所'] - 1]   = obj.amLocation;
+      if (obj.amVacation !== undefined && obj.amVacation !== '') currentRow[hm['AM_休暇'] - 1]       = obj.amVacation;
+      if (obj.amCustomer !== undefined && obj.amCustomer !== '') currentRow[hm['AM_対応顧客名'] - 1] = obj.amCustomer;
 
-      if (obj.pmStatus !== undefined && obj.pmStatus !== '')
-        currentRow[hm['PM_ステータス'] - 1] = obj.pmStatus;
-      if (obj.pmLocation !== undefined && obj.pmLocation !== '')
-        currentRow[hm['PM_勤務場所'] - 1] = obj.pmLocation;
-      if (obj.pmVacation !== undefined && obj.pmVacation !== '')
-        currentRow[hm['PM_休暇'] - 1] = obj.pmVacation;
-      if (obj.pmCustomer !== undefined && obj.pmCustomer !== '')
-        currentRow[hm['PM_対応顧客名'] - 1] = obj.pmCustomer;
+      if (obj.pmStatus   !== undefined && obj.pmStatus   !== '') currentRow[hm['PM_ステータス'] - 1] = obj.pmStatus;
+      if (obj.pmLocation !== undefined && obj.pmLocation !== '') currentRow[hm['PM_勤務場所'] - 1]   = obj.pmLocation;
+      if (obj.pmVacation !== undefined && obj.pmVacation !== '') currentRow[hm['PM_休暇'] - 1]       = obj.pmVacation;
+      if (obj.pmCustomer !== undefined && obj.pmCustomer !== '') currentRow[hm['PM_対応顧客名'] - 1] = obj.pmCustomer;
 
       summaryRows.push({
         date: normalizePlanDateKey_(currentRow[hm['日付'] - 1]),
         week: String(currentRow[hm['曜日'] - 1] || '').trim(),
-        amStatus: String(currentRow[hm['AM_ステータス'] - 1] || '').trim(),
+        amStatus:   String(currentRow[hm['AM_ステータス'] - 1] || '').trim(),
         amLocation: String(currentRow[hm['AM_勤務場所'] - 1] || '').trim(),
         amVacation: String(currentRow[hm['AM_休暇'] - 1] || '').trim(),
         amCustomer: String(currentRow[hm['AM_対応顧客名'] - 1] || '').trim(),
-        pmStatus: String(currentRow[hm['PM_ステータス'] - 1] || '').trim(),
+        pmStatus:   String(currentRow[hm['PM_ステータス'] - 1] || '').trim(),
         pmLocation: String(currentRow[hm['PM_勤務場所'] - 1] || '').trim(),
         pmVacation: String(currentRow[hm['PM_休暇'] - 1] || '').trim(),
         pmCustomer: String(currentRow[hm['PM_対応顧客名'] - 1] || '').trim(),
@@ -679,8 +641,9 @@ function api_saveMemberMonthPlanFast(payload) {
     return {
       ok: true,
       updated: targetRows.length,
-      appended: appendRows.length,
+      appended: appendRows.length
     };
+
   } catch (e) {
     console.error(e);
     return {
@@ -695,10 +658,10 @@ function api_saveMemberMonthPlanFast(payload) {
  *  ====================================================================== */
 
 function buildPlanHalfText_(status, location, vacation, customer) {
-  const st = String(status || '').trim(); // 勤務形態
-  const loc = String(location || '').trim(); // 勤務場所
-  const vac = String(vacation || '').trim(); // 休暇区分
-  const cus = String(customer || '').trim(); // 対応顧客名
+  const st  = String(status   || '').trim();   // 勤務形態
+  const loc = String(location || '').trim();   // 勤務場所
+  const vac = String(vacation || '').trim();   // 休暇区分
+  const cus = String(customer || '').trim();   // 対応顧客名
 
   if (!st && !loc && !vac && !cus) return '';
 
@@ -732,6 +695,7 @@ function buildMergedDayText_(row) {
   return `AM：${amText}\nPM：${pmText}`;
 }
 
+
 /** ======================================================================
  *   個人登録画面の API 呼び出しイメージ
  *  ====================================================================== */
@@ -746,16 +710,16 @@ function api_getSummaryView(baseYm, months) {
     }
 
     const header = values[0];
-    const rows = values.slice(1).map((r) => {
+    const rows = values.slice(1).map(r => {
       const row = r.slice();
       row[0] = normalizePlanDateKey_(row[0]);
       return row;
     });
 
     const start = firstDayOfYm_(baseYm);
-    const end = lastDayOfRange_(baseYm, months);
+    const end   = lastDayOfRange_(baseYm, months);
 
-    const filtered = rows.filter((r) => {
+    const filtered = rows.filter(r => {
       const d = parseDateFlexible_(r[0]);
       if (!d) return false;
       return d >= start && d <= end;
@@ -769,12 +733,13 @@ function api_getSummaryView(baseYm, months) {
 
     return {
       ok: true,
-      values: [header, ...filtered],
+      values: [header, ...filtered]
     };
+
   } catch (err) {
     return {
       ok: false,
-      error: err.message,
+      error: err.message
     };
   }
 }
@@ -795,7 +760,7 @@ function api_getPlanInitContext() {
 
     let defaultMember = '';
     if (loginName) {
-      defaultMember = members.find((x) => String(x).trim() === String(loginName).trim()) || '';
+      defaultMember = members.find(x => String(x).trim() === String(loginName).trim()) || '';
     }
 
     if (!defaultMember && members.length) {
@@ -812,6 +777,7 @@ function api_getPlanInitContext() {
       locationList: master.locationList || [],
       vacationList: master.vacationList || [],
     };
+
   } catch (err) {
     return {
       ok: false,
@@ -829,16 +795,22 @@ function api_getPlanHolidayList() {
       return { ok: true, dates: [] };
     }
 
-    const vals = sh
-      .getRange(PLAN_APP.HEADER_ROW + 1, PLAN_APP.HOLIDAY_COL, lastRow - PLAN_APP.HEADER_ROW, 1)
-      .getValues();
+    const vals = sh.getRange(
+      PLAN_APP.HEADER_ROW + 1,
+      PLAN_APP.HOLIDAY_COL,
+      lastRow - PLAN_APP.HEADER_ROW,
+      1
+    ).getValues();
 
-    const dates = vals.map((r) => normalizePlanDateKey_(r[0])).filter((v) => !!v);
+    const dates = vals
+      .map(r => normalizePlanDateKey_(r[0]))
+      .filter(v => !!v);
 
     return {
       ok: true,
       dates: Array.from(new Set(dates)),
     };
+
   } catch (e) {
     console.error(e);
     return {

@@ -21,37 +21,38 @@ function api_getManualList() {
     if (lastRow < 2) return { ok: true, items: [] };
 
     const values = sh.getRange(1, 1, lastRow, lastCol).getValues();
-    const headers = values[0].map((v) => String(v || '').trim());
+    const headers = values[0].map(v => String(v || '').trim());
     const rows = values.slice(1);
 
     const map = {};
-    headers.forEach((h, i) => (map[h] = i));
+    headers.forEach((h, i) => map[h] = i);
 
-    const items = rows
-      .map((r, idx) => {
-        const title = getVal_(r, map, 'タイトル');
-        const url = getVal_(r, map, 'URL');
-        const category = getVal_(r, map, 'カテゴリ');
-        const order = Number(getVal_(r, map, '表示順')) || 9999;
+    const items = rows.map((r, idx) => {
+      const title = getVal_(r, map, 'タイトル');
+      const url = getVal_(r, map, 'URL');
+      const category = getVal_(r, map, 'カテゴリ');
+      const order = Number(getVal_(r, map, '表示順')) || 9999;
 
-        if (!title || !url) return null;
+      if (!title || !url) return null;
 
-        const fileId = extractGoogleSlideId_(url);
+      const fileId = extractGoogleSlideId_(url);
 
-        return {
-          id: String(idx + 1),
-          title,
-          url,
-          category,
-          order,
-          previewUrl: fileId ? `https://docs.google.com/presentation/d/${fileId}/preview` : url,
-          embedUrl: fileId
-            ? `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000`
-            : url,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'ja'));
+      return {
+        id: String(idx + 1),
+        title,
+        url,
+        category,
+        order,
+        previewUrl: fileId
+          ? `https://docs.google.com/presentation/d/${fileId}/preview`
+          : url,
+        embedUrl: fileId
+          ? `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000`
+          : url,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'ja'));
 
     return { ok: true, items };
   } catch (err) {

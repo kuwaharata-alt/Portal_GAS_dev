@@ -7,16 +7,16 @@
     --sub: #6b7280;
     --pri: #1a73e8;
     --err: #b91c1c;
-    --pri-soft: rgba(26, 115, 232, 0.1);
+    --pri-soft: rgba(26, 115, 232, .10);
     --nav: #111827;
     --nav2: #1f2937;
-    --nav-line: rgba(255, 255, 255, 0.1);
-    --nav-text: rgba(255, 255, 255, 0.86);
-    --nav-sub: rgba(255, 255, 255, 0.6);
+    --nav-line: rgba(255, 255, 255, .10);
+    --nav-text: rgba(255, 255, 255, .86);
+    --nav-sub: rgba(255, 255, 255, .60);
   }
 
   body {
-    font-family: system-ui, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+    font-family: system-ui, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
     background: var(--bg);
     color: var(--text);
     margin: 0;
@@ -112,7 +112,7 @@
     background: var(--card);
     border: 1px solid var(--line);
     border-radius: 14px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .04);
     overflow: hidden;
   }
 
@@ -140,7 +140,7 @@
 
   th,
   td {
-    border-right: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: 1px solid rgba(0, 0, 0, .1);
   }
 
   th:last-child,
@@ -169,7 +169,7 @@
   .panel {
     flex: 1;
     padding: 16px;
-    min-height: 0;
+    min-height: 0
   }
 
   .panel .active {
@@ -191,7 +191,7 @@
   }
 
   tbody tr {
-    transition: background-color 0.12s ease;
+    transition: background-color .12s ease;
   }
 
   tbody tr:hover {
@@ -201,6 +201,8 @@
   tbody tr:hover td {
     background: #f8fbff;
   }
+
+
 
   /* ===== 共通パネルヘッダ ===== */
   .panel-head {
@@ -275,6 +277,7 @@
   }
 
   @media (max-width: 900px) {
+
     .panel-head,
     .panel-toolbar {
       flex-direction: column;

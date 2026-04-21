@@ -1,327 +1,314 @@
 <script>
-  window.OperationState = window.OperationState || { edit: false };
+window.OperationState = window.OperationState || { edit:false };
 
-  const LEVEL_OPTIONS = ['-', '低', '中', '高', '最優先'];
+const LEVEL_OPTIONS = ['-', '低', '中', '高', '最優先'];
 
-  /* ===== トースト ===== */
-  function toast_(type, title, msg) {
-    const host = document.getElementById('opToast');
-    if (!host) return;
+/* ===== トースト ===== */
+function toast_(type, title, msg){
+  const host = document.getElementById('opToast');
+  if(!host) return;
 
-    const el = document.createElement('div');
-    el.className = `toast ${type || ''}`;
-    el.innerHTML = `
+  const el = document.createElement('div');
+  el.className = `toast ${type || ''}`;
+  el.innerHTML = `
     <div class="t-title">${escapeHtml_(title || '')}</div>
     ${msg ? `<div>${escapeHtml_(msg)}</div>` : ``}
     <small>${new Date().toLocaleString()}</small>
   `;
-    host.appendChild(el);
+  host.appendChild(el);
 
-    setTimeout(() => {
-      el.remove();
-    }, 3500);
+  setTimeout(()=>{ el.remove(); }, 3500);
+}
+
+function gsRun_(fn, payload){
+  return new Promise((resolve, reject)=>{
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)[fn](payload);
+  });
+}
+
+function escapeHtml_(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;',
+    "'":'&#39;'
+  }[c]));
+}
+
+/* ======================================================================
+ * Dashboard load
+ * ====================================================================== */
+async function loadOperationDashboard(){
+  const a = document.getElementById('op-main');
+  const b = document.getElementById('op-sv');
+  const c = document.getElementById('op-cl');
+
+  if(a) a.textContent = '読み込み中...';
+  if(b) b.textContent = '読み込み中...';
+  if(c) c.textContent = '読み込み中...';
+
+  await loadOp('稼働状況', 'op-main');
+  await loadOp('SV大型案件', 'op-sv');
+  await loadOp('CL大型案件', 'op-cl');
+
+  initOpEditToggle_();
+  applyEditMode_();
+}
+
+/* ======================================================================
+ * sheet load
+ * ====================================================================== */
+async function loadOp(sheetName, targetId){
+  const box = document.getElementById(targetId);
+  if(!box) return;
+
+  box.textContent = '読み込み中...';
+
+  const res = await gsRun_('api_getOperationSheet', { sheetName });
+
+  if(!res?.ok){
+    box.textContent = 'エラー: ' + (res?.error || 'unknown');
+    toast_('ng', '読み込み失敗', res?.error || 'unknown');
+    return;
   }
 
-  function gsRun_(fn, payload) {
-    return new Promise((resolve, reject) => {
-      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](payload);
-    });
-  }
+  const headers = res.headers || [];
+  const rowsObj = res.rows || [];
+  const isKado  = (sheetName === '稼働状況');
 
-  function escapeHtml_(s) {
-    return String(s ?? '').replace(
-      /[&<>"']/g,
-      (c) =>
-        ({
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          '"': '&quot;',
-          "'": '&#39;',
-        }[c])
-    );
-  }
+  const headerMap = {};
+  headers.forEach((h, i) => {
+    headerMap[String(h ?? '').trim()] = i;
+  });
 
-  /* ======================================================================
-   * Dashboard load
-   * ====================================================================== */
-  async function loadOperationDashboard() {
-    const a = document.getElementById('op-main');
-    const b = document.getElementById('op-sv');
-    const c = document.getElementById('op-cl');
+  const iCat   = headerMap['カテゴリ'] ?? -1;
+  const iLevel = headerMap['稼働率'] ?? -1; // level変数を稼働率として使う
+  const iPerm  = headerMap['期間'] ?? -1;   // Perm
+  const iStat  = headerMap['稼働状況'] ?? -1;
+  const iUpd   = headerMap['更新日'] ?? -1;
 
-    if (a) a.textContent = '読み込み中...';
-    if (b) b.textContent = '読み込み中...';
-    if (c) c.textContent = '読み込み中...';
+  const viewHeaders = isKado ? [...headers, '保存'] : headers;
 
-    await loadOp('稼働状況', 'op-main');
-    await loadOp('SV大型案件', 'op-sv');
-    await loadOp('CL大型案件', 'op-cl');
-
-    initOpEditToggle_();
-    applyEditMode_();
-  }
-
-  /* ======================================================================
-   * sheet load
-   * ====================================================================== */
-  async function loadOp(sheetName, targetId) {
-    const box = document.getElementById(targetId);
-    if (!box) return;
-
-    box.textContent = '読み込み中...';
-
-    const res = await gsRun_('api_getOperationSheet', { sheetName });
-
-    if (!res?.ok) {
-      box.textContent = 'エラー: ' + (res?.error || 'unknown');
-      toast_('ng', '読み込み失敗', res?.error || 'unknown');
-      return;
-    }
-
-    const headers = res.headers || [];
-    const rowsObj = res.rows || [];
-    const isKado = sheetName === '稼働状況';
-
-    const headerMap = {};
-    headers.forEach((h, i) => {
-      headerMap[String(h ?? '').trim()] = i;
-    });
-
-    const iCat = headerMap['カテゴリ'] ?? -1;
-    const iLevel = headerMap['稼働率'] ?? -1; // level変数を稼働率として使う
-    const iPerm = headerMap['期間'] ?? -1; // Perm
-    const iStat = headerMap['稼働状況'] ?? -1;
-    const iUpd = headerMap['更新日'] ?? -1;
-
-    const viewHeaders = isKado ? [...headers, '保存'] : headers;
-
-    box.innerHTML = `
+  box.innerHTML = `
     <table>
       <thead>
-        <tr>${viewHeaders.map((h) => `<th>${escapeHtml_(h)}</th>`).join('')}</tr>
+        <tr>${viewHeaders.map(h=>`<th>${escapeHtml_(h)}</th>`).join('')}</tr>
       </thead>
       <tbody>
-        ${rowsObj
-          .map((obj) => {
-            const r = obj.r;
-            const row = obj.v || [];
+        ${rowsObj.map(obj=>{
+          const r = obj.r;
+          const row = obj.v || [];
 
-            const levelVal = iLevel >= 0 ? String(row[iLevel] ?? '').trim() : '';
-            const permVal = iPerm >= 0 ? String(row[iPerm] ?? '').trim() : '';
-            const statVal = iStat >= 0 ? String(row[iStat] ?? '') : '';
+          const levelVal = (iLevel >= 0) ? String(row[iLevel] ?? '').trim() : '';
+          const permVal  = (iPerm  >= 0) ? String(row[iPerm]  ?? '').trim() : '';
+          const statVal  = (iStat  >= 0) ? String(row[iStat]  ?? '') : '';
 
-            const levelInput = `
+          const levelInput = `
             <div class="op-view" data-view="level">${escapeHtml_(levelVal)}</div>
             <input class="op-input" data-col="level" type="text" value="${escapeHtml_(levelVal)}">
           `;
 
-            const permInput = `
+          const permInput = `
             <div class="op-view" data-view="perm">${escapeHtml_(permVal)}</div>
             <input class="op-input" data-col="perm" type="text" value="${escapeHtml_(permVal)}">
           `;
 
-            const statCell = `
+          const statCell = `
             <div class="op-view" data-view="status">${escapeHtml_(statVal)}</div>
-            <textarea class="op-textarea" data-col="status" rows="2">${escapeHtml_(
-              statVal
-            )}</textarea>
+            <textarea class="op-textarea" data-col="status" rows="2">${escapeHtml_(statVal)}</textarea>
           `;
 
-            const cellsHtml = row
-              .map((c, ci) => {
-                const s = String(c ?? '');
-                if (isKado && ci === iLevel) return `<td>${levelInput}</td>`;
-                if (isKado && ci === iPerm) return `<td>${permInput}</td>`;
-                if (isKado && ci === iStat) return `<td>${statCell}</td>`;
-                return `<td>${escapeHtml_(s)}</td>`;
-              })
-              .join('');
+          const cellsHtml = row.map((c, ci)=>{
+            const s = String(c ?? '');
+            if(isKado && ci === iLevel) return `<td>${levelInput}</td>`;
+            if(isKado && ci === iPerm)  return `<td>${permInput}</td>`;
+            if(isKado && ci === iStat)  return `<td>${statCell}</td>`;
+            return `<td>${escapeHtml_(s)}</td>`;
+          }).join('');
 
-            const saveBtn = isKado
-              ? `<td><button class="op-save" data-action="save">保存</button></td>`
-              : '';
+          const saveBtn = isKado
+            ? `<td><button class="op-save" data-action="save">保存</button></td>`
+            : '';
 
-            return `<tr data-row="${r}">${cellsHtml}${saveBtn}</tr>`;
-          })
-          .join('')}
+          return `<tr data-row="${r}">${cellsHtml}${saveBtn}</tr>`;
+        }).join('')}
       </tbody>
     </table>
   `;
 
-    if (isKado) {
-      applyEditMode_();
-      box.addEventListener(
-        'click',
-        async (e) => {
-          const btn = e.target.closest('button[data-action="save"]');
-          if (!btn) return;
-
-          const tr = btn.closest('tr[data-row]');
-          if (!tr) return;
-
-          const rowNum = Number(tr.dataset.row);
-          const level = tr.querySelector('[data-col="level"]')?.value ?? ''; // 稼働率
-          const Perm = tr.querySelector('[data-col="perm"]')?.value ?? ''; // 期間
-          const status = tr.querySelector('[data-col="status"]')?.value ?? '';
-
-          btn.disabled = true;
-          tr.classList.add('is-saving');
-          toast_('warn', '保存中', `行 ${rowNum}`);
-
-          try {
-            const save = await gsRun_('api_updateKado', { row: rowNum, level, Perm, status });
-            if (!save?.ok) throw new Error(save?.error || 'unknown');
-
-            if (iUpd >= 0) {
-              const tds = tr.querySelectorAll('td');
-              if (tds[iUpd]) tds[iUpd].textContent = save.updatedAt;
-            }
-
-            const vLevel = tr.querySelector('.op-view[data-view="level"]');
-            const vPerm = tr.querySelector('.op-view[data-view="perm"]');
-            const vStat = tr.querySelector('.op-view[data-view="status"]');
-
-            if (vLevel) vLevel.textContent = level;
-            if (vPerm) vPerm.textContent = Perm;
-            if (vStat) vStat.textContent = status;
-
-            toast_('ok', '保存完了', `${save.category || ''} / ${save.updatedAt}`);
-          } catch (err) {
-            toast_('ng', '保存失敗', err?.message || String(err));
-            alert('保存失敗: ' + (err?.message || err));
-          } finally {
-            tr.classList.remove('is-saving');
-            btn.disabled = false;
-          }
-        },
-        { passive: true }
-      );
-    }
-  }
-
-  /* ======================================================================
-   * save bind
-   * ====================================================================== */
-  function bindOpSave_(box, opts = {}) {
-    if (box.dataset.saveBound === '1') return;
-    box.dataset.saveBound = '1';
-
-    const { iUpd, iCat } = opts;
-
-    box.addEventListener('click', async (e) => {
+  if(isKado){
+    applyEditMode_();
+    box.addEventListener('click', async (e)=>{
       const btn = e.target.closest('button[data-action="save"]');
-      if (!btn) return;
+      if(!btn) return;
 
       const tr = btn.closest('tr[data-row]');
-      if (!tr) return;
+      if(!tr) return;
 
       const rowNum = Number(tr.dataset.row);
-      const level = tr.querySelector('[data-col="level"]')?.value ?? '';
-      const rate = tr.querySelector('[data-col="rate"]')?.value ?? '';
-      const period = tr.querySelector('[data-col="period"]')?.value ?? '';
+      const level  = tr.querySelector('[data-col="level"]')?.value ?? ''; // 稼働率
+      const Perm   = tr.querySelector('[data-col="perm"]')?.value ?? '';  // 期間
       const status = tr.querySelector('[data-col="status"]')?.value ?? '';
 
       btn.disabled = true;
       tr.classList.add('is-saving');
       toast_('warn', '保存中', `行 ${rowNum}`);
 
-      try {
-        const save = await gsRun_('api_updateKado', {
-          row: rowNum,
-          level,
-          rate,
-          period,
-          status,
-        });
+      try{
+        const save = await gsRun_('api_updateKado', { row: rowNum, level, Perm, status });
+        if(!save?.ok) throw new Error(save?.error || 'unknown');
 
-        if (!save?.ok) throw new Error(save?.error || 'unknown');
-
-        const tds = tr.querySelectorAll('td');
-
-        if (iUpd >= 0 && tds[iUpd]) {
-          tds[iUpd].textContent = save.updatedAt || '';
+        if(iUpd >= 0){
+          const tds = tr.querySelectorAll('td');
+          if(tds[iUpd]) tds[iUpd].textContent = save.updatedAt;
         }
 
         const vLevel = tr.querySelector('.op-view[data-view="level"]');
-        const vRate = tr.querySelector('.op-view[data-view="rate"]');
-        const vPeriod = tr.querySelector('.op-view[data-view="period"]');
-        const vStatus = tr.querySelector('.op-view[data-view="status"]');
+        const vPerm  = tr.querySelector('.op-view[data-view="perm"]');
+        const vStat  = tr.querySelector('.op-view[data-view="status"]');
 
-        if (vLevel) vLevel.textContent = level;
-        if (vRate) vRate.textContent = rate;
-        if (vPeriod) vPeriod.textContent = period;
-        if (vStatus) vStatus.textContent = status;
+        if(vLevel) vLevel.textContent = level;
+        if(vPerm)  vPerm.textContent  = Perm;
+        if(vStat)  vStat.textContent  = status;
 
-        toast_('ok', '保存完了', `${save.category || ''} / ${save.updatedAt || ''}`);
-      } catch (err) {
+        toast_('ok', '保存完了', `${save.category || ''} / ${save.updatedAt}`);
+      }catch(err){
         toast_('ng', '保存失敗', err?.message || String(err));
         alert('保存失敗: ' + (err?.message || err));
-      } finally {
+      }finally{
         tr.classList.remove('is-saving');
-        btn.disabled = !window.OperationState.edit;
+        btn.disabled = false;
       }
-    });
+    }, { passive:true });
   }
+}
 
-  /* ======================================================================
-   * edit toggle
-   * ====================================================================== */
-  function initOpEditToggle_() {
-    const btn = document.getElementById('btnOpEdit');
-    if (!btn) return;
+/* ======================================================================
+ * save bind
+ * ====================================================================== */
+function bindOpSave_(box, opts = {}){
+  if(box.dataset.saveBound === '1') return;
+  box.dataset.saveBound = '1';
 
-    if (btn.dataset.bound === '1') return;
-    btn.dataset.bound = '1';
+  const { iUpd, iCat } = opts;
 
-    btn.addEventListener('click', () => {
-      window.OperationState.edit = !window.OperationState.edit;
+  box.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action="save"]');
+    if(!btn) return;
 
-      btn.classList.toggle('is-on', window.OperationState.edit);
-      btn.textContent = window.OperationState.edit ? '編集ON' : '編集';
+    const tr = btn.closest('tr[data-row]');
+    if(!tr) return;
 
-      applyEditMode_();
-    });
+    const rowNum = Number(tr.dataset.row);
+    const level  = tr.querySelector('[data-col="level"]')?.value ?? '';
+    const rate   = tr.querySelector('[data-col="rate"]')?.value ?? '';
+    const period = tr.querySelector('[data-col="period"]')?.value ?? '';
+    const status = tr.querySelector('[data-col="status"]')?.value ?? '';
 
-    btn.classList.toggle('is-on', !!window.OperationState.edit);
-    btn.textContent = window.OperationState.edit ? '編集ON' : '編集';
-  }
+    btn.disabled = true;
+    tr.classList.add('is-saving');
+    toast_('warn', '保存中', `行 ${rowNum}`);
 
-  function applyEditMode_() {
-    const root = document.getElementById('op-main');
-    if (!root) return;
+    try{
+      const save = await gsRun_('api_updateKado', {
+        row: rowNum,
+        level,
+        rate,
+        period,
+        status
+      });
 
-    const on = !!window.OperationState.edit;
+      if(!save?.ok) throw new Error(save?.error || 'unknown');
 
-    root.querySelectorAll('.op-input').forEach((el) => {
-      el.disabled = !on;
-      el.style.display = on ? '' : 'none';
-    });
+      const tds = tr.querySelectorAll('td');
 
-    root.querySelectorAll('.op-textarea[data-col="status"]').forEach((el) => {
-      el.disabled = !on;
-      el.style.display = on ? '' : 'none';
-    });
+      if(iUpd >= 0 && tds[iUpd]){
+        tds[iUpd].textContent = save.updatedAt || '';
+      }
 
-    root.querySelectorAll('.op-view').forEach((el) => {
-      el.style.display = on ? 'none' : '';
-    });
+      const vLevel  = tr.querySelector('.op-view[data-view="level"]');
+      const vRate   = tr.querySelector('.op-view[data-view="rate"]');
+      const vPeriod = tr.querySelector('.op-view[data-view="period"]');
+      const vStatus = tr.querySelector('.op-view[data-view="status"]');
 
-    root.querySelectorAll('.op-save').forEach((btn) => {
-      btn.disabled = !on;
-    });
-  }
+      if(vLevel)  vLevel.textContent  = level;
+      if(vRate)   vRate.textContent   = rate;
+      if(vPeriod) vPeriod.textContent = period;
+      if(vStatus) vStatus.textContent = status;
 
-  /* ======================================================================
-   * multiline columns helper
-   * ====================================================================== */
-  function buildMlCols_(headers, sheetName) {
-    if (sheetName === '稼働状況') {
-      return headers
-        .map((h, i) => ({ h: String(h || '').trim(), i }))
-        .filter((x) => x.h.includes('稼働状況'))
-        .map((x) => x.i);
+      toast_('ok', '保存完了', `${save.category || ''} / ${save.updatedAt || ''}`);
+
+    }catch(err){
+      toast_('ng', '保存失敗', err?.message || String(err));
+      alert('保存失敗: ' + (err?.message || err));
+    }finally{
+      tr.classList.remove('is-saving');
+      btn.disabled = !window.OperationState.edit;
     }
-    return [];
+  });
+}
+
+/* ======================================================================
+ * edit toggle
+ * ====================================================================== */
+function initOpEditToggle_(){
+  const btn = document.getElementById('btnOpEdit');
+  if(!btn) return;
+
+  if(btn.dataset.bound === '1') return;
+  btn.dataset.bound = '1';
+
+  btn.addEventListener('click', ()=>{
+    window.OperationState.edit = !window.OperationState.edit;
+
+    btn.classList.toggle('is-on', window.OperationState.edit);
+    btn.textContent = window.OperationState.edit ? '編集ON' : '編集';
+
+    applyEditMode_();
+  });
+
+  btn.classList.toggle('is-on', !!window.OperationState.edit);
+  btn.textContent = window.OperationState.edit ? '編集ON' : '編集';
+}
+
+function applyEditMode_(){
+  const root = document.getElementById('op-main');
+  if(!root) return;
+
+  const on = !!window.OperationState.edit;
+
+  root.querySelectorAll('.op-input').forEach(el=>{
+    el.disabled = !on;
+    el.style.display = on ? '' : 'none';
+  });
+
+  root.querySelectorAll('.op-textarea[data-col="status"]').forEach(el=>{
+    el.disabled = !on;
+    el.style.display = on ? '' : 'none';
+  });
+
+  root.querySelectorAll('.op-view').forEach(el=>{
+    el.style.display = on ? 'none' : '';
+  });
+
+  root.querySelectorAll('.op-save').forEach(btn=>{
+    btn.disabled = !on;
+  });
+}
+
+/* ======================================================================
+ * multiline columns helper
+ * ====================================================================== */
+function buildMlCols_(headers, sheetName){
+  if(sheetName === '稼働状況'){
+    return headers
+      .map((h, i)=>({ h:String(h || '').trim(), i }))
+      .filter(x => x.h.includes('稼働状況'))
+      .map(x => x.i);
   }
+  return [];
+}
 </script>

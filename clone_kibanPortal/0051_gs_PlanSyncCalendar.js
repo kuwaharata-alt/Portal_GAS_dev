@@ -7,25 +7,14 @@ function api_syncMemberMonthPlanCalendar(payload) {
     const hm = getHeaderMap_(sh, 1);
 
     const required = [
-      '日付',
-      '曜日',
-      'AM_ステータス',
-      'AM_勤務場所',
-      'AM_休暇',
-      'AM_対応顧客名',
-      'AM_eventId',
-      'AM_syncStatus',
-      'AM_syncAt',
-      'PM_ステータス',
-      'PM_勤務場所',
-      'PM_休暇',
-      'PM_対応顧客名',
-      'PM_eventId',
-      'PM_syncStatus',
-      'PM_syncAt',
+      '日付','曜日',
+      'AM_ステータス','AM_勤務場所','AM_休暇','AM_対応顧客名',
+      'AM_eventId','AM_syncStatus','AM_syncAt',
+      'PM_ステータス','PM_勤務場所','PM_休暇','PM_対応顧客名',
+      'PM_eventId','PM_syncStatus','PM_syncAt'
     ];
 
-    required.forEach((h) => {
+    required.forEach(h => {
       if (!hm[h]) throw new Error('個人シートのヘッダー不足: ' + h);
     });
 
@@ -59,7 +48,7 @@ function api_syncMemberMonthPlanCalendar(payload) {
 
     const out = values.map((r, idx) => {
       const rowNo = idx + 2;
-      const sync = syncResults.find((x) => x.sheetRow === rowNo);
+      const sync = syncResults.find(x => x.sheetRow === rowNo);
 
       if (!sync) {
         return [
@@ -88,6 +77,7 @@ function api_syncMemberMonthPlanCalendar(payload) {
       ok: true,
       count: syncResults.length,
     };
+
   } catch (e) {
     console.error(e);
     return {
@@ -105,21 +95,21 @@ const PLAN_CAL_SYNC = {
   STATUS_FIXED: '確定',
   STATUS_TENTATIVE: '仮',
 
-  ALL_START: { h: 9, m: 0 },
-  ALL_END: { h: 18, m: 0 },
+  ALL_START: { h: 9,  m: 0 },
+  ALL_END:   { h: 18, m: 0 },
 
-  AM_START: { h: 9, m: 0 },
-  AM_END: { h: 14, m: 0 },
+  AM_START:  { h: 9,  m: 0 },
+  AM_END:    { h: 14, m: 0 },
 
-  PM_START: { h: 14, m: 0 },
-  PM_END: { h: 18, m: 0 },
+  PM_START:  { h: 14, m: 0 },
+  PM_END:    { h: 18, m: 0 },
 };
 
 function syncMemberMonthPlanToCalendar_(memberName, rows) {
   const cal = CalendarApp.getCalendarById(PLAN_CAL_SYNC.CALENDAR_ID);
   if (!cal) throw new Error('Googleカレンダーが取得できません');
 
-  return (rows || []).map((row) => syncOnePlanRowToCalendar_(cal, memberName, row));
+  return (rows || []).map(row => syncOnePlanRowToCalendar_(cal, memberName, row));
 }
 
 function syncOnePlanRowToCalendar_(cal, memberName, row) {
@@ -287,9 +277,12 @@ function upsertCalendarEvent_(cal, eventId, payload) {
     }
   }
 
-  const ev = cal.createEvent(payload.title, payload.start, payload.end, {
-    description: payload.description || '',
-  });
+  const ev = cal.createEvent(
+    payload.title,
+    payload.start,
+    payload.end,
+    { description: payload.description || '' }
+  );
 
   return { action: '作成', eventId: ev.getId() };
 }
@@ -322,7 +315,15 @@ function parsePlanDate_(value) {
 }
 
 function makeDateTime_(baseDate, h, m) {
-  return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h, m, 0, 0);
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate(),
+    h,
+    m,
+    0,
+    0
+  );
 }
 
 function formatSyncAt_(d) {

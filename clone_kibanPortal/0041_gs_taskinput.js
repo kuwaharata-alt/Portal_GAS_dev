@@ -1,3 +1,4 @@
+
 /** タスク追加 */
 function api_addTask(task) {
   try {
@@ -15,12 +16,12 @@ function api_addTask(task) {
 
     const no = Math.max(1, lastRow); // 1行目ヘッダ前提
 
-    sh.getRange(nextRow, 1).setValue(no); // No
-    sh.getRange(nextRow, 2).setValue(taskName); // タスク
-    sh.getRange(nextRow, 3).setValue(link); // リンク
+    sh.getRange(nextRow, 1).setValue(no);         // No
+    sh.getRange(nextRow, 2).setValue(taskName);   // タスク
+    sh.getRange(nextRow, 3).setValue(link);       // リンク
     sh.getRange(nextRow, 4).setValue(dateVal || ''); // 期日
-    sh.getRange(nextRow, 5).setValue('未着手'); // ステータス
-    sh.getRange(nextRow, 6).setValue(0); // 進捗率
+    sh.getRange(nextRow, 5).setValue('未着手');   // ステータス
+    sh.getRange(nextRow, 6).setValue(0);          // 進捗率
     sh.getRange(nextRow, 6).setNumberFormat('0%');
 
     const map = getTaskHeaderMap_(sh);

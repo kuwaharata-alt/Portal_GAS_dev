@@ -54,9 +54,7 @@ function enumerateDates_(baseYm, months) {
 }
 
 function firstDayOfYm_(ym) {
-  const [y, m] = String(ym || '')
-    .split('/')
-    .map(Number);
+  const [y, m] = String(ym || '').split('/').map(Number);
   if (!y || !m) throw new Error('baseYm が不正です: ' + ym);
   return new Date(y, m - 1, 1);
 }

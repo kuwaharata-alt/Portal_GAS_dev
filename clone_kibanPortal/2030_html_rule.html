@@ -25,13 +25,14 @@
         <option value="false">無効のみ</option>
       </select>
 
-      <input id="q" placeholder="検索（内容/備考）" onkeydown="if(event.key==='Enter') reload()" />
+      <input id="q" placeholder="検索（内容/備考）"
+            onkeydown="if(event.key==='Enter') reload()" />
 
       <button onclick="reload()">再読込</button>
     </div>
 
     <!-- ===== Edit Bar ===== -->
-    <div class="rule-bar" id="barEdit" style="display: none">
+    <div class="rule-bar" id="barEdit" style="display:none;">
       <button class="rule-primary" onclick="openNew()">＋ 新規登録</button>
 
       <select id="category" onchange="reload()">
@@ -52,17 +53,14 @@
         <option value="false">無効のみ</option>
       </select>
 
-      <input
-        id="qEdit"
-        placeholder="検索（内容/備考）"
-        onkeydown="if(event.key==='Enter') reload()"
-      />
+      <input id="qEdit" placeholder="検索（内容/備考）"
+            onkeydown="if(event.key==='Enter') reload()" />
 
       <button onclick="reload()">再読込</button>
     </div>
 
     <!-- ===== History Bar ===== -->
-    <div class="rule-bar" id="barHistory" style="display: none">
+    <div class="rule-bar" id="barHistory" style="display:none;">
       <select id="historyLimit" onchange="reloadHistory()">
         <option value="50">最新50件</option>
         <option value="200" selected>最新200件</option>
@@ -77,26 +75,22 @@
     <div id="viewWrap"></div>
 
     <!-- ===== Edit Table ===== -->
-    <div id="editWrap" style="display: none">
+    <div id="editWrap" style="display:none;">
       <table class="rule-table">
-        <thead>
-          ...
-        </thead>
+        <thead> ... </thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
 
     <!-- ===== History ===== -->
-    <div id="historyWrap" style="display: none">
+    <div id="historyWrap" style="display:none;">
       <table class="rule-table">
-        <thead>
-          ...
-        </thead>
+        <thead> ... </thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
 
     <!-- ===== Dialog ===== -->
-    <dialog id="dlg" class="rule-dialog">...</dialog>
+    <dialog id="dlg" class="rule-dialog"> ... </dialog>
   </div>
 </section>

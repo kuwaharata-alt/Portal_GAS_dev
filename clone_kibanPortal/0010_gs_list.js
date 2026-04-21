@@ -1,5 +1,5 @@
 /** ======================================================================
- * 案件一覧表示用
+ * 案件一覧表示用 
  * ====================================================================== */
 const WEBVIEW = {
   SS_KEY: 'Project',
@@ -47,9 +47,13 @@ function api_list(params) {
     const cfg = VIEW_CONFIG[type] || VIEW_CONFIG.SV;
 
     const q = normalizeSearchText_(p.q || '');
-    const memberFilters = Array.isArray(p.members) ? p.members.map(nz_).filter(Boolean) : [];
+    const memberFilters = Array.isArray(p.members)
+      ? p.members.map(nz_).filter(Boolean)
+      : [];
     const categoryFilter = nz_(p.category);
-    const statusFilters = Array.isArray(p.statuses) ? p.statuses.map(nz_).filter(Boolean) : [];
+    const statusFilters = Array.isArray(p.statuses)
+      ? p.statuses.map(nz_).filter(Boolean)
+      : [];
 
     const ss = getSS_(WEBVIEW.SS_KEY);
     const shProject = ss.getSheetByName(WEBVIEW.SHEET_PROJECT);
@@ -65,46 +69,41 @@ function api_list(params) {
     const rows = [];
     const projectMap = projectObj.rowMap;
 
-    (detailObj.rows || []).forEach((dt) => {
+    (detailObj.rows || []).forEach(dt => {
       const key = nz_(dt[WEBVIEW.KEY_HEADER]);
       if (!key) return;
 
       const pj = projectMap[key] || {};
-      const rowObj = buildListRow_(type, key, pj, dt);
+      const category = getRowCategory_(type, pj, dt);
+      const memberNames = getRowMemberNames_(pj, dt);
+      const statusFilterValue = getStatusFilterValue_(dt);
 
       if (memberFilters.length > 0) {
-        const hit = memberFilters.some((name) => rowObj.memberNames.includes(name));
+        const hit = memberFilters.some(name => memberNames.includes(name));
         if (!hit) return;
       }
 
-      if (categoryFilter && rowObj.category !== categoryFilter) {
-        return;
-      }
+      if (categoryFilter && category !== categoryFilter) return;
 
       if (statusFilters.length > 0) {
-        const hit = statusFilters.includes(rowObj.statusFilterValue || '');
-        if (!hit) return;
+        if (!statusFilters.includes(statusFilterValue || '')) return;
       }
 
-      const searchText = normalizeSearchText_(
-        [
-          rowObj.key,
-          rowObj.customer,
-          rowObj.category,
-          rowObj.statusFilterValue,
-          rowObj.memberNames.join(' '),
-          stripHtml_(rowObj.cells[0]),
-          stripHtml_(rowObj.cells[1]),
-          stripHtml_(rowObj.cells[2]),
-          stripHtml_(rowObj.cells[3]),
-          stripHtml_(rowObj.cells[4]),
-          stripHtml_(rowObj.cells[5]),
-        ].join('\n')
-      );
+      if (q) {
+        const searchText = normalizeSearchText_(
+          [
+            key,
+            category,
+            statusFilterValue,
+            memberNames.join(' '),
+            ...Object.values(pj),
+            ...Object.values(dt),
+          ].join('\n')
+        );
+        if (searchText.indexOf(q) === -1) return;
+      }
 
-      if (q && searchText.indexOf(q) === -1) return;
-
-      rows.push(rowObj);
+      rows.push(buildListRow_(type, key, pj, dt));
     });
 
     return {
@@ -151,17 +150,19 @@ function api_getListFilterMaster(params) {
     const categorySet = new Set();
     const statusSet = new Set();
 
-    (detailObj.rows || []).forEach((dt) => {
+    (detailObj.rows || []).forEach(dt => {
       const key = nz_(dt[WEBVIEW.KEY_HEADER]);
       if (!key) return;
 
       const pj = projectMap[key] || {};
-      const rowObj = buildListRow_(type, key, pj, dt);
+      const category = getRowCategory_(type, pj, dt);
+      const statusFilterValue = getStatusFilterValue_(dt);
+      const memberNames = getRowMemberNames_(pj, dt);
 
-      if (rowObj.category) categorySet.add(rowObj.category);
-      if (rowObj.statusFilterValue) statusSet.add(rowObj.statusFilterValue);
+      if (category) categorySet.add(category);
+      if (statusFilterValue) statusSet.add(statusFilterValue);
 
-      (rowObj.memberNames || []).forEach((name) => {
+      memberNames.forEach(name => {
         if (name) memberSet.add(name);
       });
     });
@@ -202,7 +203,14 @@ function buildListRow_(type, key, pj, dt) {
     category,
     memberNames,
     statusFilterValue,
-    cells: [statusHtml, summaryHtml, caseInfoHtml, memberHtml, periodHtml, remarksHtml],
+    cells: [
+      statusHtml,
+      summaryHtml,
+      caseInfoHtml,
+      memberHtml,
+      periodHtml,
+      remarksHtml,
+    ],
   };
 }
 
@@ -229,15 +237,13 @@ function buildStatusHtml_(dt, type) {
 }
 
 function parseStatusParts_(raw) {
-  const s = String(raw || '')
-    .replace(/\r/g, '')
-    .trim();
+  const s = String(raw || '').replace(/\r/g, '').trim();
   const m = s.match(/^【([^】]+)】\s*\n?\s*(.*)$/);
 
   return {
     raw: s,
     kind: m ? m[1].trim() : '',
-    status: m ? m[2].trim() : s,
+    status: m ? m[2].trim() : s
   };
 }
 
@@ -249,7 +255,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '案件管理',
       status: rawStatus || '未設定',
-      displayText: rawStatus || '未設定',
+      displayText: rawStatus || '未設定'
     };
   }
 
@@ -258,7 +264,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: 'ドキュメント',
       status: st,
-      displayText: `ドキュメント\n${st}`,
+      displayText: `ドキュメント\n${st}`
     };
   }
 
@@ -267,7 +273,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '社内作業中',
       status: st,
-      displayText: `社内作業中\n${st}`,
+      displayText: `社内作業中\n${st}`
     };
   }
 
@@ -276,7 +282,7 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '現地作業中',
       status: st,
-      displayText: `現地作業中\n${st}`,
+      displayText: `現地作業中\n${st}`
     };
   }
 
@@ -285,14 +291,14 @@ function resolveMainStatusDisplay_(parsed, dt) {
     return {
       kind: '倉庫作業中',
       status: st,
-      displayText: `倉庫作業中\n${st}`,
+      displayText: `倉庫作業中\n${st}`
     };
   }
 
   return {
     kind: kind || '',
     status: rawStatus || '未設定',
-    displayText: rawStatus || '未設定',
+    displayText: rawStatus || '未設定'
   };
 }
 
@@ -388,9 +394,7 @@ function buildSummaryHtml_(key, customer, pj, dt, type) {
 
   const headText = `【${escapeHtml_(key)}】${escapeHtml_(customer)}`;
   const headHtml = estimateUrl
-    ? `<a class="case-summary-link" href="${escapeHtml_(
-        estimateUrl
-      )}" target="_blank" rel="noopener noreferrer">${headText}</a>`
+    ? `<a class="case-summary-link" href="${escapeHtml_(estimateUrl)}" target="_blank" rel="noopener noreferrer">${headText}</a>`
     : headText;
 
   return `
@@ -403,7 +407,13 @@ function buildSummaryHtml_(key, customer, pj, dt, type) {
 
 function getEstimateUrl_(pj, dt) {
   // 1) 案件情報シートの「見積」列を最優先
-  const pjUrl = firstNonEmpty_(pj['__link_見積'], pj['見積'], dt['__link_見積'], dt['見積']);
+  const pjUrl =
+    firstNonEmpty_(
+      pj['__link_見積'],
+      pj['見積'],
+      dt['__link_見積'],
+      dt['見積']
+    );
 
   if (isUrlLike_(pjUrl)) return pjUrl;
 
@@ -419,11 +429,17 @@ function buildCaseInfoHtml_(pj, dt, type) {
   const rows = [];
   const workCategory = getRowCategory_(type, pj, dt);
 
-  const workplace = type === 'SV' ? nz_(dt['作業形態']) : '倉庫作業';
+  const workplace = type === 'SV'
+    ? nz_(dt['作業形態'])
+    : '倉庫作業';
 
-  const place = type === 'SV' ? joinNonEmpty_([dt['現地']]) : '';
+  const place = type === 'SV'
+    ? joinNonEmpty_([dt['現地']])
+    : '';
 
-  const due = type === 'SV' ? nz_(pj['検収予定']) || nz_(dt['検収予定']) : nz_(dt['検収予定']);
+  const due = type === 'SV'
+    ? (nz_(pj['検収予定']) || nz_(dt['検収予定']))
+    : nz_(dt['検収予定']);
 
   rows.push(infoLineHtml_('作業カテゴリ', workCategory));
   rows.push(infoLineHtml_('作業形態', workplace));
@@ -458,7 +474,7 @@ function buildPeriodHtml_(dt, type) {
     const caseText = '未設定';
     const inText = rangeText_(dt['社内作業開始日'], dt['社内作業終了日']);
     const outText = rangeText_(dt['現地作業開始日'], dt['現地作業終了日']);
-    const warn = !nz_(dt['完了予定']) && !nz_(dt['検収予定']) ? '完了予定未設定' : '';
+    const warn = (!nz_(dt['完了予定']) && !nz_(dt['検収予定'])) ? '完了予定未設定' : '';
 
     return `
       <div class="wp-wrap-simple">
@@ -511,7 +527,13 @@ function getRowMemberNames_(pj, dt) {
   const support2 = splitMemberNames_(dt['サポート2']);
   const support3 = splitMemberNames_(dt['サポート3']);
 
-  return uniqueNonEmpty_([...supervisor, ...manager, ...support1, ...support2, ...support3]);
+  return uniqueNonEmpty_([
+    ...supervisor,
+    ...manager,
+    ...support1,
+    ...support2,
+    ...support3,
+  ]);
 }
 
 /** -----------------------------
@@ -540,9 +562,7 @@ function wpRowHtml_(label, value) {
     <div class="wp-row-simple">
       <div class="wp-label-simple">${escapeHtml_(label)}</div>
       <div class="wp-lane-simple">
-        <div class="wp-bar-simple"><span class="wp-bar-text-simple">${escapeHtml_(
-          value
-        )}</span></div>
+        <div class="wp-bar-simple"><span class="wp-bar-text-simple">${escapeHtml_(value)}</span></div>
       </div>
     </div>
   `;
@@ -581,7 +601,7 @@ function parseStatus_(text) {
 
   return {
     kind: m ? m[1] : '',
-    label: m ? m[2] : s,
+    label: m ? m[2] : s
   };
 }
 
@@ -600,10 +620,14 @@ function readSheetObjects_(sheet, headerRow, keyHeader) {
 
   const range = sheet.getRange(1, 1, readRows, lastCol);
   const values = range.getDisplayValues();
-  const richValues = range.getRichTextValues();
 
   const headers = (values[headerRow - 1] || []).map(normalizeHeader_);
   const map = buildHeaderMap0_(headers);
+
+  const estimateLinkIdx = map['見積'];
+  const estimateRichValues = estimateLinkIdx != null
+    ? sheet.getRange(1, estimateLinkIdx + 1, readRows, 1).getRichTextValues()
+    : null;
 
   const keyIdx = map[keyHeader];
   if (keyIdx == null) {
@@ -615,7 +639,6 @@ function readSheetObjects_(sheet, headerRow, keyHeader) {
 
   for (let r = headerRow; r < values.length; r++) {
     const row = values[r] || [];
-    const richRow = richValues[r] || [];
     const key = stringifyCell_(row[keyIdx]);
     if (!key) continue;
 
@@ -627,10 +650,12 @@ function readSheetObjects_(sheet, headerRow, keyHeader) {
       const cellText = stringifyCell_(row[i]);
       obj[h] = cellText;
 
-      const rt = richRow[i];
-      const linkUrl = getCellLinkUrl_(rt);
-      if (linkUrl) {
-        obj[`__link_${h}`] = linkUrl;
+      if (h === '見積' && estimateRichValues) {
+        const rt = estimateRichValues[r] ? estimateRichValues[r][0] : null;
+        const linkUrl = getCellLinkUrl_(rt);
+        if (linkUrl) {
+          obj[`__link_${h}`] = linkUrl;
+        }
       }
     });
 
@@ -673,9 +698,7 @@ function getCellLinkUrl_(rt) {
  * common
  * ----------------------------- */
 function normalizeHeader_(v) {
-  return String(v == null ? '' : v)
-    .replace(/\r?\n/g, '')
-    .trim();
+  return String(v == null ? '' : v).replace(/\r?\n/g, '').trim();
 }
 
 function buildHeaderMap0_(headers) {
@@ -691,10 +714,7 @@ function stringifyCell_(v) {
 }
 
 function normalizeSearchText_(v) {
-  return String(v == null ? '' : v)
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
+  return String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 function nz_(v) {
